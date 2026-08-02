@@ -1,0 +1,72 @@
+{
+  "note": "Semua link internal root-relative (/...), portabel. Halaman = file .html di root ATAU folder/index.html.",
+  "content_types": [
+    {
+      "type": "article",
+      "url_pattern": "/{slug}.html",
+      "example": "/menjaga-keamanan-gedung-walet.html",
+      "count": 31,
+      "quirk": "slug bebas; beberapa slug berakhiran '-html' (mis. /pengaturan-cahaya-gedung-walet-html.html) & ada near-duplicate (mengenal- vs mengenali-)"
+    },
+    {
+      "type": "city_landing_bangun",
+      "url_pattern": "/bangun-gedung-walet-{kota}.html",
+      "example": "/bangun-gedung-walet-surabaya.html",
+      "count": 102,
+      "quirk": "BUKAN /kota/. Kata ganda: 'bangun-gedung-walet' + kota. Menu bar pakai /bangun (tanpa suffix) sbg hub."
+    },
+    {
+      "type": "city_landing_desain",
+      "url_pattern": "/desain-gedung-walet-{kota}.html",
+      "example": "/desain-gedung-walet-bandung.html",
+      "count": 102,
+      "quirk": "paralel dgn bangun; hub menu /desain"
+    },
+    {
+      "type": "size_landing",
+      "url_pattern": "/rumah-walet-{ukuran}.html",
+      "example": "/rumah-walet-4x8.html",
+      "count": 11,
+      "quirk": "ukuran format {lebar}x{panjang}; hub menu /ukuran"
+    },
+    {
+      "type": "static_page",
+      "url_pattern": "/{slug}/ (folder/index.html)",
+      "examples": [
+        "/tentang-kami/",
+        "/kontak-kami/",
+        "/desain/",
+        "/bangun-gedung-walet/",
+        "/ukuran/",
+        "/area-pelayanan/"
+      ],
+      "quirk": "pretty-URL folder, trailing slash; berbeda dari artikel yg .html"
+    },
+    {
+      "type": "category_archive",
+      "url_pattern": "/category/{cat}/ + /category/{cat}/page/{n}/",
+      "cats": [
+        "bangun-gedung-walet",
+        "desain-gedung-walet",
+        "rumah-walet"
+      ]
+    },
+    {
+      "type": "author_archive",
+      "url_pattern": "/author/syamsul-alam/ + /page/{n}/ (s.d. 22)"
+    }
+  ],
+  "sitemaps": [
+    "/page-sitemap.xml",
+    "/post-sitemap1.xml",
+    "/post-sitemap2.xml"
+  ],
+  "dead_wp_endpoints_still_referenced": [
+    "/feed",
+    "/comments/feed",
+    "/?s= (search)",
+    "/wp-json",
+    "xmlrpc.php",
+    "/?p="
+  ]
+}

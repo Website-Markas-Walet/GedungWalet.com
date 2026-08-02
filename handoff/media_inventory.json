@@ -1,0 +1,30 @@
+{
+  "local_media_count": 551,
+  "local_media_roots": [
+    "wp-content/uploads/YYYY/MM/",
+    "img/"
+  ],
+  "external_hotlinks_by_host": {
+    "1.bp.blogspot.com": 246,
+    "blogger.googleusercontent.com": 55,
+    "gedungwalet.com": 27
+  },
+  "external_hotlink_total": 328,
+  "rehome_to_R2": {
+    "reason": "aset tidak dimiliki (Blogger) — rapuh, wajib di-rehome ke cdn.markaswalet.id (R2)",
+    "blogger_unique_urls": 16,
+    "sample": [
+      "https://1.bp.blogspot.com/-G7Ry88nzsIc/XE0WadBR40I/AAAAAAAAD7g/d4Hkhyj_yWc8sON8meHL_mTQT2dB5E7hACLcBGAs/s1600/cust-care_0-1.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg-CGVATfB_KCeeZar9Uuq_sxE98rNG3VMyJSiwCbSV5uKmIhcPfQ1pvcTyCDNDPco7UyLJZ1tRd5jDI90Fs7VDYFa8OnmWLAUtTJY3fjnIK7apT5DTe4T82KkYvbXs--zHObz6pOULdaeRr9QWYa3m9mtk6wM_VlNzXkL5e7CAV7lETGP-xzFYMOeJPg/s3000/gedung%20walet%203.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg2GkKIeE7fkriNHtKrZxW5PK5C9OaDU47N9n4z7CQYP90u2PdEbAbhJj4IY-sFas0t02OVIQjPkX6tAl-Vs9k9YImLI9LjBHyWVbt0XQVwtJpMGPk_WRbRaGHBIn25OHtl06dXfCXVm8gcLo9_b8_a8lqcqhXUUyOg9_jzWnqH8aKtiIslVhBDB_4A4Q/s3000/gedung%20walet%2016.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgH-u1ZNAdChg6Bhi8JCrKs11xa0ZAQM2vbrR5G817ZWVLK5kQ0P1Gnby-hREZNuKjHJCq2G2FEUgrYRCLRr01ZiiDGaWp5QJYZeDZV-XQ147b0hoYpUc8Zm2Z2pz40j1AKZSlXYc7pHhjgUBtkDvyLJkEsWGoj1LF76lRlPjZKUK69pGjCs9joUwT8qA/s3000/gedung%20walet%2012.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhUkk5aih35YC6xy_cbrb525HRgK6acN5bsJ0g268obO8nrmL_t9wU1OW3mbuUAtaWYcCBBCy-eIjLfzTKZhE2S1OFLPwXlVkPwL7xC_JAj8vGqCjeS17bw1SbAIGvaO9pUnLFaxTM2e-RiUM7RsjJ8veWTEJJ87Ty2WIwRoI7DGtD-xQW13Vb89DTZVw/s3000/gedung%20walet%2014.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhhX5VlOX3xz628Q729yfJQFBtBGUHI3yZQtmkeaJztYumAGlb7fR27VQ7EhP_nYH80_P7Zrlph3m6w7Tda8SNEtHiUFUaqvM6hF6xEEQTtIDgWBB2Y3iugDH_f3MtYiBoVBC-D2VYDxoccm0m-R3qNVQbzwf1scwpWThxEi-nKhcsNNic2928iZLJ2yw/s3000/gedung%20walet%202.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhkGgxMwuvUa7FTEgJQnexJkqYWfvPu-Lvxh5pzONpkvRnotROjzc7wV6DyLO5Q65him3rL-sQes9tVBcceZbi6hX8ZypvVUo1ZBQDsgo6Hd1UcmLhenFxBi8tqvEGXcH6X42LJz0TVmo7WszoUASIkXXP5xwVmONNuLGNzQXLmBwVVE44dTdITba7lHQ/s3000/gedung%20walet%207.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhn_fQFrMJ2UA467t5aCnXgTNSWvwzVFmAfDtLjaWEhNXp_VN75CtHczaDGfK7Jo_tJsnksuzoDZSVHqMDBkDTKAUu5EPa6CwoqiAPER7GzTPgIKk061-VixEqc_JWa1U1VF3rUswkaimxy1vPl-LGLUHohdaGSQvuEKe1wRpArEak45bWO-t-FTQmK-A/s3000/gedung%20walet%206.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiOFIUuYc9UuiaHDOPz6MGEwdU1B9kRjSjgRcQD2y9EErW35zzdMXesvGm_7-UOP47u_8S3TW_9vYufXUETWBu5-nkde6pRBD2woystpg_XVFrZ-S72JtPAb-iG2sB-oNxh4zdnux0uTMsQTjOgMAScKoUwuQ1ya_rAxyC0fJQpwLT8jDWGVeiX7NRndQ/s3000/gedung%20walet%205.png",
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiXWlxevxvZAyZfN0MkEOcMbDgPnX4xOLjln7wknPxtW8yyiisXTal1W4YXJsmIo85M906v98Ye4MFOx2yT2gU9wclsjU2vvn2_0rcWPsMM6JBoLbqPkuLW9ee2kgpWlBUdTH90cEaIoiWdI3HSHZDAljAfi0wfQ01aTKeuSsQfPhnJETd7jb24lj9eJQ/s3000/gedung%20walet%204.png"
+    ]
+  },
+  "mixed_content_http_images": 8
+}
