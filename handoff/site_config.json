@@ -1,0 +1,77 @@
+{
+  "site": "gedungwalet.com",
+  "generator": "WordPress 6.1.1 (static export) — theme Astra, builder Elementor, SEO Rank Math",
+  "language": "en-US (deklarasi html lang salah; konten Bahasa Indonesia)",
+  "analytics": {
+    "gtm": "GTM-W6D44WS",
+    "google_adsense": "ca-pub-2869782316576155",
+    "facebook_domain_verification": "x06vtpsirds63nhlybz51avq11jjic",
+    "ga4": null,
+    "tiktok": null
+  },
+  "brand": {
+    "logo": "/wp-content/uploads/2021/07/Custom-dimensions-800x200-px-1.png",
+    "favicon": [
+      "/wp-content/uploads/2021/07/cropped-favicon-32x32.png",
+      "/wp-content/uploads/2021/07/cropped-favicon-192x192.png",
+      "/wp-content/uploads/2021/07/cropped-favicon-180x180.png"
+    ],
+    "fonts": [
+      "Roboto",
+      "Raleway",
+      "Roboto Slab (Google Fonts)"
+    ],
+    "accent_colors": [
+      "#1565C0 (biru utama)",
+      "#1a1a1a",
+      "#ffffff",
+      "#ebf2f7"
+    ]
+  },
+  "contact": {
+    "whatsapp": "6285235350662",
+    "whatsapp_link": "https://api.whatsapp.com/send?phone=6285235350662",
+    "phone_display": "0852 3535 0662",
+    "address": "Mulyosari Tengah No. 97 F, Kel. Kalisari, Kec. Mulyorejo, Kota Surabaya, Prov. Jawa Timur",
+    "email": null
+  },
+  "primary_menu": [
+    {
+      "label": "Home",
+      "url": "/"
+    },
+    {
+      "label": "Layanan",
+      "url": "#layanan-kami"
+    },
+    {
+      "label": "Desain Gedung Walet",
+      "url": "/desain"
+    },
+    {
+      "label": "Bangun Gedung Walet",
+      "url": "/bangun"
+    },
+    {
+      "label": "Ukuran Gedung Walet",
+      "url": "/ukuran"
+    },
+    {
+      "label": "Tentang Kami",
+      "url": "/tentang-kami"
+    },
+    {
+      "label": "Kontak Kami",
+      "url": "/kontak-kami"
+    },
+    {
+      "label": "Area Pelayanan",
+      "url": "/area-pelayanan"
+    }
+  ],
+  "ecosystem_links_found": {
+    "budidayawalet.net": 23,
+    "markaswalet.com": 2,
+    "sarangwalet.web.id": 1
+  }
+}
