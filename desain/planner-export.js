@@ -23,6 +23,10 @@ function wrap(ctx, text, maxW) {
 }
 
 export async function makeSheet(m, a, img3d) {
+  const cv = await makeSheetCanvas(m, a, img3d);
+  return new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
+}
+export async function makeSheetCanvas(m, a, img3d) {
   try { await document.fonts?.ready; } catch {}
   const LV = levels(m), n = LV.length, CW = 2000, M = 56, RIGHT = 640, GAP = 36;
   const leftW = CW - 2 * M - RIGHT - GAP;
@@ -129,5 +133,28 @@ export async function makeSheet(m, a, img3d) {
   c.fillStyle = '#5a6472'; c.font = `15px ${FONT}`;
   c.fillText(`Denah konsep (indikatif), bukan gambar kerja. Sarang efektif hanya dari papan sirip di ruang inap. *Asumsi ${RULES.sarangPerMeterSirip} sarang per meter sirip. **Skala dari RBW 6×12 m 2 lantai = ${RULES.produksi6x12KgTahun[0]}–${RULES.produksi6x12KgTahun[1]} kg/tahun.`, M, fy + 28);
 
-  return new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
+  return cv;
+}
+
+// Bungkus canvas lembar desain menjadi PDF satu halaman (JPEG DCTDecode di dalam PDF — tanpa pustaka luar).
+export function canvasPDF(cv, q = 0.92) {
+  const bin = atob(cv.toDataURL('image/jpeg', q).split(',')[1]);
+  const img = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) img[i] = bin.charCodeAt(i);
+  const W = cv.width, H = cv.height, enc = s => new TextEncoder().encode(s);
+  const parts = []; let off = 0; const offs = [];
+  const push = c => { parts.push(c); off += c.length; };
+  const obj = (n, body) => { offs[n] = off; push(enc(`${n} 0 obj\n${body}\nendobj\n`)); };
+  push(enc('%PDF-1.4\n'));
+  obj(1, '<</Type/Catalog/Pages 2 0 R>>');
+  obj(2, '<</Type/Pages/Kids[3 0 R]/Count 1>>');
+  obj(3, `<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${W} ${H}]/Resources<</XObject<</Im0 4 0 R>>/ProcSet[/PDF/ImageC]>>/Contents 5 0 R>>`);
+  offs[4] = off;
+  push(enc(`4 0 obj\n<</Type/XObject/Subtype/Image/Width ${W}/Height ${H}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${img.length}>>\nstream\n`));
+  push(img); push(enc('\nendstream\nendobj\n'));
+  const ct = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+  obj(5, `<</Length ${ct.length}>>\nstream\n${ct}\nendstream`);
+  const xref = off;
+  push(enc(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map(n => String(offs[n]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`));
+  return new Blob(parts, { type: 'application/pdf' });
 }

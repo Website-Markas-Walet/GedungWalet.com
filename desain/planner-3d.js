@@ -12,7 +12,7 @@ import { SARANG_WARNA } from './planner-data.js';
 let renderer, scene, camera, controls, host, raf, group, flock, sunL, hemi, legend, tagBox, statBox, bar, senter, sync3;
 const geoCache = new Map(), matCache = new Map();
 const st = { view: 'iso', mode: 'semua', burung: true, peta: 'nyaman', udara: false, walk: false };   // pilihan toolbar 3D
-let last = null, camKey = '', camTween = null, W3 = null, B3 = null, simSig = '', birds = [], flow = null, tags = [], junk = [], tPrev = 0, statT = 0, pergi = 0;
+let last = null, camKey = '', camTween = null, W3 = null, B3 = null, simSig = '', birds = [], flow = null, tags = [], junk = [], tPrev = 0, statT = 0, pergi = 0, siteT = { href: null, tex: null };
 const GAP = 2.5;        // jarak antar lantai pada tampilan terurai (m)
 // mode "jalan di dalam" (POV manusia): posisi, arah pandang, tinggi mata, lantai, senter
 const wk = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, h: 1.6, lv: 0, senter: false, keys: {}, stair: null, cam: null };
@@ -156,6 +156,22 @@ export function build(model, active = 0, opts = {}) {
   const g = new THREE.Mesh(gnd, mat(COL.ground, 0));
   g.rotation.x = -Math.PI / 2; g.position.y = -0.01; g.receiveShadow = true;
   group.add(g);
+  // foto satelit lokasi sebagai tanah — gedung berdiri di lahan aslinya
+  if (opts.site?.href) {
+    if (siteT.href !== opts.site.href) {
+      siteT.tex?.dispose();
+      const tex = new THREE.TextureLoader().load(opts.site.href, () => {});
+      tex.colorSpace = THREE.SRGBColorSpace;
+      siteT = { href: opts.site.href, tex };
+    }
+    const pg = new THREE.PlaneGeometry(opts.site.w, opts.site.h), pmm = new THREE.MeshBasicMaterial({ map: siteT.tex, transparent: true, opacity: Math.min(1, (opts.site.op ?? 0.7) + 0.15), depthWrite: false });
+    junk.push(pg, pmm);
+    const wrap = new THREE.Group(), pm = new THREE.Mesh(pg, pmm);
+    pm.rotation.x = -Math.PI / 2; pm.renderOrder = -1;
+    wrap.add(pm); wrap.rotation.y = -((opts.site.rot || 0) * Math.PI) / 180;
+    wrap.position.set(X(opts.site.cx), 0.02, Z(opts.site.cy));
+    group.add(wrap);
+  }
 
   const hexPts = [];
   LV.forEach((fl, i) => {
