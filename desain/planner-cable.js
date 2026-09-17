@@ -10,6 +10,8 @@ export const KABEL_WARNA = ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const r1 = v => Math.round(v * 10) / 10;
 export const KABEL_JENIS = [['twinap', 'Tweeter inap'], ['twtarik', 'Tweeter tarik'], ['hexa', 'Hexagonal (panggil)']];
+// Cakupan lantai channel: -1 = semua, angka = satu lantai, [a, b] = gabungan lantai a–b (gedung kecil: 2 lantai 1 channel).
+export const chCover = (ch, li) => ch.f === -1 || (Array.isArray(ch.f) ? li >= ch.f[0] && li <= ch.f[1] : +ch.f === li);
 
 // Daftar channel: dari m.kabel.ch bila sudah diatur; kalau belum, otomatis inap & tarik per lantai + 1 channel hexagonal.
 export function channels(m) {
@@ -100,7 +102,7 @@ export function cableInfo(m) {
     let len = 0, tembus = false, count = 0;
     const runs = [];
     LV.forEach((fl, li) => {
-      if (!(ch.f === -1 || ch.f === li)) return;
+      if (!chCover(ch, li)) return;
       const tws = fl.items.filter(t => t.t === ch.t);
       if (!tws.length) return;
       count += tws.length;

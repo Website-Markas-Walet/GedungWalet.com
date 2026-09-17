@@ -5,7 +5,7 @@
 // Jadwal timer AC ikut dihitung: kategori yang sedang mati pada jam simulasi tidak bersuara. Perkiraan kasar.
 import { SIM_DEFAULT, AUDIO_DEFAULT, dbTarget } from './planner-data.js';
 import { levels, floorRect, spaces, wallSegs, openingsOn, solidPieces, center } from './planner-geom.js';
-import { channels } from './planner-cable.js';
+import { channels, chCover } from './planner-cable.js';
 
 const CAT = { twinap: 'inap', twtarik: 'tarik', hexa: 'panggil' };
 const ATT = s => (s.bahan === 'bata' || s.ext ? 22 : s.jenis === 'gantung' ? 4 : 10);
@@ -25,7 +25,7 @@ export function simulateSound(m) {
   const chs = channels(m), target = dbTarget(m.survey?.env || 'sawah');
   const mati = ['panggil', 'tarik', 'inap'].filter(c => !jamAktif(jadwal[c], +sim.jam));
   const volOf = (t, li) => {
-    const ch = chs.find(c => c.t === t && (c.f === -1 || c.f === li));
+    const ch = chs.find(c => c.t === t && chCover(c, li));
     return ch && ch.on !== false ? ch.vol : null;
   };
   const floors = LV.map((fl, li) => {

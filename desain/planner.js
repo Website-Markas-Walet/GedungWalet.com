@@ -379,7 +379,7 @@ function cableRuns() {
 }
 function renderPlan() {
   const r = svg.getBoundingClientRect(); if (!r.width || !model) return;
-  svg.setAttribute('class', 'pl-plan' + (tool === 'sekat' ? ' t-sekat' : tool.startsWith('place:') || tool === 'calib' ? ' t-place' : tool === 'ukur' ? ' t-ukur' : '')
+  svg.setAttribute('class', 'pl-plan' + (tool === 'sekat' ? ' t-sekat' : tool.startsWith('place:') || tool === 'calib' ? ' t-place' : tool === 'ukur' ? ' t-ukur' : tool === 'site' ? ' t-site' : '')
     + (tool === 'geser' || spaceDown ? ' t-geser' : '') + (drag?.mode === 'pan' ? ' panning' : ''));
   der = derive(model, floor());
   const sk = SK.getSketch(model, cur), L = luxOn ? (drag ? luxRes : luxEnsure()) : null, lf = L?.floors[cur];
@@ -392,9 +392,17 @@ function renderPlan() {
     luxLabels: lf ? luxLabels(L, lf) : dbOn && !drag ? dbLabels() : null,
     measures: ms, marquee: drag?.mode === 'marquee' ? drag : null, flow: lf ? L.flow[cur] : null, link: drag?.mode === 'link' ? drag : null,
     show: showOf, air: airOn ? airArrows() : null, cables: kabelOn && !drag ? cableRuns() : null,
-    site: site?.src ? { href: SK.sketchHref(site), cx: model.w / 2, cy: model.h / 2, w: site.wM || model.w * 3, h: (site.wM || model.w * 3) * ((site.rot || 0) % 180 ? site.iw / site.ih : site.ih / site.iw), rot: site.rot || 0, op: site.op ?? 0.7 } : null,
+    site: site?.src ? siteDraw() : null,
     mark: mark && (mark.f == null || mark.f === cur) ? mark : null,
   });
+  // alat "Geser / perbesar foto": bingkai + pegangan sudut foto satelit (fotonya yang digeser, bukan gedung)
+  if (tool === 'site' && site?.src) {
+    const R = siteRect(site), rad = ((site.rot || 0) * Math.PI) / 180, co = Math.cos(rad), si = Math.sin(rad);
+    const pts = [[-R.w / 2, -R.h / 2], [R.w / 2, -R.h / 2], [R.w / 2, R.h / 2], [-R.w / 2, R.h / 2]]
+      .map(([x, y]) => [vp.ox + (R.cx + x * co - y * si) * vp.s, vp.oy + (R.cy + x * si + y * co) * vp.s]);
+    html += `<g class="siteBox"><polygon points="${pts.map(p2 => p2.map(v => round(v, 1)).join(',')).join(' ')}" fill="none" stroke="#1565C0" stroke-width="1.6" stroke-dasharray="8 5"/>`
+      + pts.map(([x, y], k) => `<rect class="hs" data-hs="${k}" x="${round(x - 6, 1)}" y="${round(y - 6, 1)}" width="12" height="12" rx="2"/>`).join('') + '</g>';
+  }
   const one = single();
   if (one?.kind === 'wall' && !one.el.locked) html += [1, 2].map(k => `<circle class="hdw" data-end="${k}" cx="${round(vp.ox + one.el['x' + k] * vp.s, 1)}" cy="${round(vp.oy + one.el['y' + k] * vp.s, 1)}" r="6"/>`).join('');
   if (tool === 'calib' && calib?.p1) {
@@ -529,6 +537,14 @@ svg.addEventListener('pointerdown', e => {
   if (tool === 'calib') return calibClick(p);
   if (tool === 'ukur') { const a = magnet(p, true); drag = { mode: 'ukur', x1: a.x, y1: a.y, x2: a.x, y2: a.y }; capture(e); return; }
   if (tool === 'sekat') { const a = magnet(p); drag = { mode: 'wall', x1: a.x, y1: a.y, x2: a.x, y2: a.y }; capture(e); return; }
+  if (tool === 'site') {   // geser / perbesar foto satelit (bukan gedungnya)
+    const sk2 = SK.getSketch(model, 100);
+    if (!sk2?.src) { setTool('select'); return; }
+    const R = siteRect(sk2), c = { x: R.cx, y: R.cy };
+    if (e.target.closest('.hs')) drag = { mode: 'siteScale', sk: sk2, d0: Math.max(0.4, dist(p, c)), w0: R.w };
+    else drag = { mode: 'siteMove', sk: sk2, p0: p, cx0: R.cx, cy0: R.cy };
+    capture(e); return;
+  }
   if (tool.startsWith('place:')) return placeAt(tool.slice(6), p, e.shiftKey);
   if (e.target.closest('.mnlink')) return goLevel(model.floors.length);
   const hc = e.target.closest('.hc'), hcIt = hc && findItem(hc.dataset.id);
@@ -555,6 +571,12 @@ svg.addEventListener('pointermove', e => {
   if (drag.mode === 'pan') { vp.ox = drag.ox + e.clientX - drag.sx; vp.oy = drag.oy + e.clientY - drag.sy; renderPlan(); return; }
   const p = pt(e);
   if (drag.mode === 'marquee' || drag.mode === 'link') { drag.x2 = p.x; drag.y2 = p.y; renderPlan(); return; }
+  if (drag.mode === 'siteMove') { drag.sk.cx = round(drag.cx0 + p.x - drag.p0.x); drag.sk.cy = round(drag.cy0 + p.y - drag.p0.y); renderPlan(); return; }
+  if (drag.mode === 'siteScale') {
+    const c = { x: drag.sk.cx ?? model.w / 2, y: drag.sk.cy ?? model.h / 2 };
+    drag.sk.wM = round(clamp((drag.w0 * dist(p, c)) / drag.d0, 2, 800));
+    renderPlan(); renderSide(false); return;
+  }
   if (drag.mode === 'ukur') {
     const b = magnet(p, true); let x2 = b.x, y2 = b.y;
     if (e.shiftKey) { if (Math.abs(x2 - drag.x1) > Math.abs(y2 - drag.y1)) y2 = drag.y1; else x2 = drag.x1; }
@@ -618,7 +640,8 @@ svg.addEventListener('pointerup', e => {
   } else if (dm === 'ukur') {
     const len = Math.hypot(drag.x2 - drag.x1, drag.y2 - drag.y1);
     if (len >= 0.05) { measures.push({ f: cur, x1: drag.x1, y1: drag.y1, x2: drag.x2, y2: drag.y2 }); measures = measures.slice(-40); hint(`Jarak ${len.toFixed(2).replace('.', ',')} m`); }
-  } else if (dm === 'link') linkDrop(e);
+  } else if (dm === 'siteMove' || dm === 'siteScale') SK.setSketch(model, 100, { ...drag.sk });
+  else if (dm === 'link') linkDrop(e);
   else if (dm !== 'pan' && drag.moved) {
     if ((dm === 'wallend' || dm === 'wallmove') && findWall(drag.id)) joinWall(findWall(drag.id));
     const hx = dm === 'move' && findItem(drag.id);   // tweeter hexagonal yang dilepas dekat LMB langsung menempel
@@ -1052,10 +1075,21 @@ stFile.onchange = async () => {
   const f = stFile.files[0]; stFile.value = ''; if (!f) return;
   try {
     const p = await SK.loadImageFile(f, 2400);
-    SK.setSketch(model, 100, { ...p, site: true, wM: Math.round(model.w * 3), op: 0.7 });
-    renderAll(); hint('Foto satelit terpasang — atur lebar foto (meter) agar skalanya pas dengan lahan.', 8000);
+    SK.setSketch(model, 100, { ...p, site: true, wM: Math.round(model.w * 3), op: 0.7, cx: round(model.w / 2), cy: round(model.h / 2) });
+    renderAll(); hint('Foto satelit terpasang — tekan "Geser / perbesar foto" lalu seret fotonya (bukan gedungnya) sampai lahan pas.', 9000);
   } catch (err) { hint(err.message); }
 };
+// kotak foto satelit dalam meter denah (pusat + ukuran mengikuti rasio foto & rotasi)
+function siteRect(sk) {
+  const w = sk.wM || model.w * 3, h = w * ((sk.rot || 0) % 180 ? sk.iw / sk.ih : sk.ih / sk.iw);
+  return { cx: sk.cx ?? model.w / 2, cy: sk.cy ?? model.h / 2, w, h };
+}
+function siteDraw() {
+  const sk = SK.getSketch(model, 100);
+  if (!sk?.src) return null;
+  const R = siteRect(sk);
+  return { href: SK.sketchHref(sk), cx: R.cx, cy: R.cy, w: R.w, h: R.h, rot: sk.rot || 0, op: sk.op ?? 0.7 };
+}
 function siteCard() {
   const sk = SK.getSketch(model, 100);
   if (!sk) return `<div class="card"><h4>${icon('map', 14)} Lokasi (satelit)</h4>
@@ -1064,12 +1098,17 @@ function siteCard() {
   return `<div class="card"><h4>${icon('map', 14)} Lokasi (satelit)</h4>
     <div class="row"><span class="k">Lebar foto di denah (m)</span><input type="number" id="stW" min="${Math.ceil(model.w)}" max="500" step="5" value="${Math.round(sk.wM || model.w * 3)}"></div>
     <div class="row"><span class="k">Kejelasan</span><input type="range" id="stOp" min="10" max="100" step="5" value="${Math.round((sk.op ?? 0.7) * 100)}"></div>
-    <div class="acts"><button type="button" id="stRot">${icon('turn', 14)} Putar 90°</button><button type="button" id="stUp">Ganti foto</button><button type="button" class="danger" id="stDel" title="Hapus foto satelit">${icon('trash', 14)}</button></div>
-    <p class="tip">Samakan lebar foto dengan jarak sebenarnya (lihat garis skala di pojok Google Maps). Foto hanya tersimpan di perangkat ini, tidak ikut link desain.</p></div>`;
+    <div class="acts"><button type="button" id="stMove" class="${tool === 'site' ? 'warnb' : ''}">${icon('hand', 14)} ${tool === 'site' ? 'Selesai menggeser' : 'Geser / perbesar foto'}</button><button type="button" id="stRot">${icon('turn', 14)} Putar 90°</button></div>
+    <div class="acts"><button type="button" id="stUp">Ganti foto</button><button type="button" class="danger" id="stDel" title="Hapus foto satelit">${icon('trash', 14)}</button></div>
+    <p class="tip">"Geser / perbesar foto": seret FOTONYA agar gedung pas di lahan (gedung tidak ikut bergeser); seret kotak sudut untuk memperbesar/mengecil; Esc selesai. Foto ikut tampil sebagai tanah di 3D. Hanya tersimpan di perangkat ini, tidak ikut link desain.</p></div>`;
 }
 function bindSiteCard() {
   const on = (id, fn) => { const b = $('#' + id); if (b) b.onclick = fn; };
   on('stUp', () => stFile.click());
+  on('stMove', () => {
+    setTool(tool === 'site' ? 'select' : 'site');
+    if (tool === 'site') hint('Seret foto satelit untuk menggeser (gedung tetap diam); seret kotak sudut untuk memperbesar. Esc selesai.', 9000);
+  });
   const sk = SK.getSketch(model, 100); if (!sk) return;
   const upd = o => { SK.setSketch(model, 100, { ...sk, ...o }); renderPlan(); };
   const w = $('#stW'); if (w) w.onchange = e => upd({ wM: clamp(Math.round(+e.target.value || model.w * 3), Math.ceil(model.w), 500) });
@@ -1102,7 +1141,7 @@ function birdCard() {
     ${bad.length ? `<p class="tip"><span class="bad">${bad.length} ruang kurang / tidak nyaman</span> — lihat alasannya; atur ulang sekat, LAR, dan tweeter.</p>` : '<p class="tip"><span class="ok">✓ Semua ruang inap nyaman bagi walet.</span></p>'}
     <table class="luxt">${rows}</table></div>`;
 }
-const opts3d = () => ({ show: showOf });
+const opts3d = () => ({ show: showOf, site: siteDraw() });
 // Simulasi cahaya seluruh gedung: lux rata-rata tiap ruang per lantai + legenda warna.
 const LUX_ORDER = { void: 0, jalur: 1, audio: 2, lain: 3, inap: 4 };
 function luxCard() {
@@ -1299,7 +1338,7 @@ function renderAll() {
 }
 document.querySelectorAll('.pl-seg [data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
 $('#btnProject').onclick = () => D.dlgManual(false);
-$('#btnNew').onclick = () => D.dlgStart(false);
+$('#btnNew').innerHTML = `${icon('plan', 15)} Proyek`; $('#btnNew').onclick = () => D.dlgProjects();
 $('#btnFinish').onclick = () => D.dlgFinish();
 $('#btnAudio').innerHTML = `${icon('audio', 15)} Ruang audio`; $('#btnAudio').onclick = () => D.dlgAudio();
 $('#btnRAB').innerHTML = `${icon('table', 15)} RAB`; $('#btnRAB').onclick = () => D.dlgRAB();
@@ -1326,7 +1365,19 @@ window.addEventListener('hashchange', () => {
 });
 
 const fromLink = D.parseShare(location.hash);
+let firstRun = false;
 if (fromLink) { history.replaceState(null, '', location.pathname + location.search); app.setModel(fromLink); }
 else if (load()) { resetSig(); fit(); renderAll(); }
-else { app.setModel(newModel({ name: 'Rumah Walet', w: 4, h: 12, floors: 4, floorH: RULES.lantaiTinggi, auto: true }).model); D.dlgStart(true); }
+else { firstRun = true; app.setModel(newModel({ name: 'Rumah Walet', w: 4, h: 12, floors: 4, floorH: RULES.lantaiTinggi, auto: true }).model); }
+// gerbang masuk: seluruh editor disembunyikan sampai login (username/password diperiksa di sisi klien)
+if (D.isAuthed()) { if (firstRun) D.dlgStart(true); }
+else {
+  document.body.classList.add('pl-lock');
+  D.dlgLogin(() => {
+    document.body.classList.remove('pl-lock');
+    fit(); renderAll();
+    hint('Selamat datang! Folder proyek (simpan / buka / hapus) ada di tombol "Proyek".', 7000);
+    if (firstRun) D.dlgStart(true);
+  });
+}
 SK.loadSketches().then(() => { if (!model) return; SK.prune(model); renderTools(); renderPlan(); renderSide(); });

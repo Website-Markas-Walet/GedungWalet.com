@@ -166,8 +166,9 @@ export function dlgFinish() {
      <label for="fNote">Catatan untuk arsitek (opsional)</label><textarea id="fNote" rows="2" placeholder="Misal: lahan di pinggir sawah, sudah ada gedung tetangga…"></textarea>
      <div class="sum1"><b>Ringkasan:</b> ${fmt(m.w)} × ${fmt(m.h)} m, ${m.floors.length} lantai, tinggi ${fmt(m.floorH)} m · sirip efektif ${fmt(a.siripM)} m (±${fmt(a.siripM3)} m³ papan) · ±${fmt(a.sarang)} sarang${a.lux ? ` · ruang inap maks ${luxTxt(a.lux.maxInap)}` : ''} · skor ${a.score}/100</div>
      <div class="thumbs">${levels(m).map((f, i) => `<figure>${floorSVG(m, i, s, { pad: 4, dims: false, labels: false, chain: false, struktur: false, pfx: 'th' + i })}<figcaption>${f.name}</figcaption></figure>`).join('')}</div>`,
-    `<button type="button" class="pl-btn" id="dCopy">Salin link desain</button><button type="button" class="pl-btn pl-primary" id="dWA">${icon('wa', 16)} Kirim ke WhatsApp</button>`);
+    `<button type="button" class="pl-btn" id="dPDF">Unduh PDF</button><button type="button" class="pl-btn" id="dCopy">Salin link desain</button><button type="button" class="pl-btn pl-primary" id="dWA">${icon('wa', 16)} Kirim ke WhatsApp</button>`);
   $('#dCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); $('#dCopy').textContent = 'Tersalin ✓'; } catch { prompt('Salin link ini:', link); } };
+  $('#dPDF').onclick = () => downloadPDF($('#dPDF'));
   $('#dWA').onclick = () => {
     m.owner = $('#fOwner').value.trim(); m.city = $('#fCity2').value.trim(); A.save();
     const note = $('#fNote').value.trim();
@@ -191,6 +192,85 @@ export function dlgFinish() {
     window.open(`https://api.whatsapp.com/send?phone=${WA_NUMBER}&text=${encodeURIComponent(lines.join('\n'))}`, '_blank', 'noopener');
     try { window.dataLayer?.push({ event: 'planner_finish', size: `${m.w}x${m.h}`, floors: m.floors.length, score: a.score, mode: m.survey ? 'pengamatan' : 'manual' }); } catch {}
   };
+}
+
+// Unduh lembar desain (denah semua lantai + 3D + ringkasan) sebagai PDF satu halaman.
+export async function downloadPDF(btn) {
+  const t0 = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = 'Menyiapkan PDF…'; }
+  try {
+    const m = A.model, three = await A.load3D(), img3d = three.snapshotSheet(m, 1280, 960);
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js');
+    const cv = await makeSheetCanvas(m, A.analyze(), img3d);
+    const url = URL.createObjectURL(canvasPDF(cv));
+    const el = document.createElement('a');
+    el.href = url; el.download = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${m.w}x${m.h}-${m.floors.length}lt.pdf`;
+    document.body.append(el); el.click(); el.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (btn) btn.textContent = 'PDF terunduh ✓';
+  } catch (e) { console.error('PDF', e); if (btn) btn.textContent = 'Gagal membuat PDF'; }
+  finally { if (btn) setTimeout(() => { btn.disabled = false; btn.textContent = t0; }, 2500); }
+}
+
+// ---------- login & folder proyek (gerbang sisi-klien: kredensial tetap terlihat di kode — bukan keamanan server,
+// hanya membatasi akses kasual sesuai permintaan pemilik; data proyek tersimpan di localStorage perangkat) ----------
+const LOGIN = { u: 'admin', p: 'admin123' };
+export const isAuthed = () => { try { return localStorage.getItem('waletPlanner.login') === '1'; } catch { return false; } };
+export function dlgLogin(onOk) {
+  openDlg('Masuk Walet Planner',
+    `<p class="lead">Halaman desain ini khusus pengguna terdaftar. Masuk untuk membuka editor dan folder proyek Anda.</p>
+     <label for="lgU">Username</label><input id="lgU" autocomplete="username" placeholder="username">
+     <label for="lgP">Password</label><input id="lgP" type="password" autocomplete="current-password" placeholder="password">
+     <p class="err" id="lgErr" hidden>Username atau password salah.</p>`,
+    `<button type="button" class="pl-btn pl-primary" id="lgIn">Masuk</button>`);
+  $('#dClose').style.display = 'none';
+  dlg.oncancel = e => e.preventDefault();   // Esc tidak menutup sebelum berhasil masuk
+  const masuk = () => {
+    if ($('#lgU').value.trim() === LOGIN.u && $('#lgP').value === LOGIN.p) {
+      try { localStorage.setItem('waletPlanner.login', '1'); } catch {}
+      dlg.oncancel = null; dlg.close(); onOk?.();
+    } else { $('#lgErr').hidden = false; $('#lgP').value = ''; $('#lgP').focus(); }
+  };
+  $('#lgIn').onclick = masuk;
+  [$('#lgU'), $('#lgP')].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') masuk(); }));
+  $('#lgU').focus();
+}
+const projList = () => { try { const l = JSON.parse(localStorage.getItem('waletPlanner.projects')); return Array.isArray(l) ? l : []; } catch { return []; } };
+const projPut = l => { try { localStorage.setItem('waletPlanner.projects', JSON.stringify(l.slice(0, 30))); return true; } catch { return false; } };
+export function dlgProjects() {
+  const render = () => {
+    const m = A.model, list = projList().sort((a, b) => b.up - a.up);
+    openDlg('Folder proyek',
+      `<p class="lead">Simpan beberapa desain di perangkat ini, buka kembali, atau hapus. Untuk dibagikan / dibuka di perangkat lain, tetap pakai "Salin link desain".</p>
+       <div class="acts"><button type="button" class="pl-btn pl-blue" id="pjSave">${icon('plan', 14)} Simpan proyek aktif</button>
+        <button type="button" class="pl-btn" id="pjNew">${icon('plus', 14)} Proyek baru</button>
+        <button type="button" class="pl-btn" id="pjOut" style="margin-left:auto" title="Keluar akun — halaman meminta login lagi">Keluar akun</button></div>
+       ${list.length ? `<table class="pl-leg pjt">${list.map(p => `<tr><td><b>${esc(p.nm)}</b><br><small>${fmt(p.w)}×${fmt(p.h)} m · ${p.n} lantai${p.id === m.id ? ' · sedang dibuka' : ''} · ${new Date(p.up).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></td>
+         <td style="white-space:nowrap;text-align:right"><button type="button" class="mini" data-buka="${esc(p.id)}">Buka</button> <button type="button" class="mini" data-hapus="${esc(p.id)}">Hapus</button></td></tr>`).join('')}</table>`
+        : '<p class="tip">Folder masih kosong — tekan "Simpan proyek aktif" untuk menyimpan desain yang sedang terbuka.</p>'}`,
+      `<button type="button" class="pl-btn pl-primary" id="pjClose">Tutup</button>`, 'mid');
+    $('#pjClose').onclick = () => dlg.close();
+    $('#pjSave').onclick = () => {
+      const nm = prompt('Nama proyek:', m.name || 'Rumah Walet'); if (nm === null) return;
+      m.name = nm.trim().slice(0, 80) || m.name; A.save();
+      const l = projList().filter(p => p.id !== m.id);
+      l.unshift({ id: m.id, nm: m.name || 'Rumah Walet', up: Date.now(), w: m.w, h: m.h, n: m.floors.length, m: JSON.parse(JSON.stringify(m)) });
+      if (!projPut(l)) alert('Penyimpanan perangkat penuh — hapus proyek lama dulu.');
+      A.renderAll(); render();
+    };
+    $('#pjNew').onclick = () => dlgStart(false);
+    $('#pjOut').onclick = () => { if (!confirm('Keluar akun? Halaman akan meminta login lagi.')) return; try { localStorage.removeItem('waletPlanner.login'); } catch {} location.reload(); };
+    dlg.querySelectorAll('[data-buka]').forEach(b => b.onclick = () => {
+      const p = projList().find(q => q.id === b.dataset.buka); if (!p) return;
+      if (!confirm(`Buka "${p.nm}"? Desain yang sedang terbuka diganti — simpan dulu ke folder bila perlu.`)) return;
+      dlg.close(); A.setModel(JSON.parse(JSON.stringify(p.m))); A.hint(`Proyek "${p.nm}" dibuka.`);
+    });
+    dlg.querySelectorAll('[data-hapus]').forEach(b => b.onclick = () => {
+      const p = projList().find(q => q.id === b.dataset.hapus); if (!p) return;
+      if (!confirm(`Hapus proyek "${p.nm}" dari perangkat ini?`)) return;
+      projPut(projList().filter(q => q.id !== p.id)); render();
+    });
+  };
+  render();
 }
 
 // ---------- link desain (seluruh isi desain di-encode di URL) ----------
@@ -315,7 +395,9 @@ export function parseShare(hash) {
       model.audio = { ...(items.length ? { items } : {}), ...(Object.keys(jd).length ? { jadwal: jd } : {}) };
     }
     if (Array.isArray(s.kb?.ch) && s.kb.ch.length) model.kabel = { ch: s.kb.ch.slice(0, 24).map(c => ({
-      t: ['twinap', 'twtarik', 'hexa'].includes(c?.t) ? c.t : 'twinap', f: Math.round(num(c?.f, -1, 9, -1)), n: Math.round(num(c?.n, 1, 6, 1)),
+      t: ['twinap', 'twtarik', 'hexa'].includes(c?.t) ? c.t : 'twinap',
+      f: Array.isArray(c?.f) ? [Math.round(num(c.f[0], 0, 9, 0)), Math.round(num(c.f[1], 0, 9, 0))].sort((a, b) => a - b) : Math.round(num(c?.f, -1, 9, -1)),
+      n: Math.round(num(c?.n, 1, 6, 1)),
       nm: txt(c?.nm), vol: Math.round(num(c?.vol, 40, 110, 70)), fd: txt(c?.fd), ket: String(c?.ket ?? '').slice(0, 160), ...(c?.on === false ? { on: false } : {}) })) };
     if (s.rb && typeof s.rb === 'object') {
       const h = {}, k = {};
@@ -523,8 +605,12 @@ export function dlgAudio() {
   // channel bekerja pada salinan; disimpan ke m.kabel.ch saat "Simpan"
   let ch = channels(m).map(c => ({ t: c.t, f: c.f, n: c.n, nm: c.nm, vol: c.vol, fd: c.fd || '', ket: c.ket || '', on: c.on !== false }));
   const su = SUARA[m.survey?.env || 'sawah'], tg = dbTarget(m.survey?.env || 'sawah');
-  const fOpts = v => [[-1, 'Semua lantai'], ...m.floors.map((f, i) => [i, f.name]), ...(m.menara ? [[m.floors.length, 'Menara']] : [])]
-    .map(([k, t]) => `<option value="${k}"${+v === +k ? ' selected' : ''}>${t}</option>`).join('');
+  // pilihan lantai: semua, per lantai, gabungan 2 lantai (gedung kecil: 2 lantai cukup 1 channel), menara
+  const fKey = v => (Array.isArray(v) ? v.join(':') : String(v));
+  const fOpts = v => [[-1, 'Semua lantai'], ...m.floors.map((f, i) => [i, f.name]),
+    ...m.floors.slice(0, -1).map((f, i) => [`${i}:${i + 1}`, `Lantai ${i + 1} + ${i + 2}`]),
+    ...(m.menara ? [[m.floors.length, 'Menara']] : [])]
+    .map(([k, t]) => `<option value="${k}"${fKey(v) === String(k) ? ' selected' : ''}>${t}</option>`).join('');
   const render = () => {
     let cab = null; try { cab = cableInfo({ ...m, kabel: { ch } }); } catch {}
     const lenOf = c => cab?.chs.find(q => q.nm === c.nm && q.t === c.t && q.f === c.f)?.len;
@@ -573,7 +659,7 @@ export function dlgAudio() {
       if (p === 'on') c.on = inp.checked;
       else if (p === 'nm' || p === 'fd' || p === 'ket') c[p] = inp.value.slice(0, 160);
       else if (p === 't') c.t = inp.value;
-      else if (p === 'f') c.f = +inp.value;
+      else if (p === 'f') c.f = inp.value.includes(':') ? inp.value.split(':').map(Number) : +inp.value;
       else c[p] = clamp(Math.round(+inp.value || 0), p === 'n' ? 1 : 40, p === 'n' ? 6 : 110);
       rd();
     });
@@ -692,18 +778,19 @@ async function exportSheet() {
   try {
     const three = await A.load3D();
     const img3d = three.snapshotSheet(m, 1280, 960);   // semua lantai, tanpa burung / peta; tampilan 3D pengguna dikembalikan
-    const { makeSheet } = await import('./planner-export.js');
-    const blob = await makeSheet(m, A.analyze(), img3d);
-    const url = URL.createObjectURL(blob);
-    const file = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${m.w}x${m.h}-${m.floors.length}lt.png`;
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js');
+    const cv = await makeSheetCanvas(m, A.analyze(), img3d);
+    const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
+    const url = URL.createObjectURL(blob), urlPdf = URL.createObjectURL(canvasPDF(cv));
+    const nm0 = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${m.w}x${m.h}-${m.floors.length}lt`;
     openDlg('Lembar desain',
-      `<p class="lead">Kirim gambar ini ke WhatsApp pelanggan${m.owner ? ` (${esc(m.owner)})` : ''}. Pilih "Salin gambar" lalu tempel (Ctrl+V) di WhatsApp Web, atau unduh PNG.</p><img class="sheet" src="${url}" alt="Lembar desain rumah walet">`,
-      `<button type="button" class="pl-btn" id="dCopyImg">Salin gambar</button><a class="pl-btn pl-primary" href="${url}" download="${esc(file)}">Unduh PNG</a>`, true);
+      `<p class="lead">Kirim gambar ini ke WhatsApp pelanggan${m.owner ? ` (${esc(m.owner)})` : ''}. Pilih "Salin gambar" lalu tempel (Ctrl+V) di WhatsApp Web, atau unduh PNG / PDF.</p><img class="sheet" src="${url}" alt="Lembar desain rumah walet">`,
+      `<button type="button" class="pl-btn" id="dCopyImg">Salin gambar</button><a class="pl-btn" href="${urlPdf}" download="${esc(nm0)}.pdf">Unduh PDF</a><a class="pl-btn pl-primary" href="${url}" download="${esc(nm0)}.png">Unduh PNG</a>`, true);
     $('#dCopyImg').onclick = async () => {
       try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); $('#dCopyImg').textContent = 'Tersalin ✓'; }
       catch { A.hint('Browser tidak mengizinkan salin gambar — gunakan Unduh PNG.'); }
     };
-    dlg.addEventListener('close', () => URL.revokeObjectURL(url), { once: true });
+    dlg.addEventListener('close', () => { URL.revokeObjectURL(url); URL.revokeObjectURL(urlPdf); }, { once: true });
     A.hint('');
   } catch (err) { console.error(err); A.hint('Gagal membuat lembar desain.'); }
 }
