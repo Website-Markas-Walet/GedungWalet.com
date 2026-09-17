@@ -1,0 +1,15 @@
+name = "sketsa-ai"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Halaman yang boleh memanggil Worker ini (pisahkan dengan koma).
+ALLOWED_ORIGINS = "https://gedungwalet.com,https://www.gedungwalet.com,http://localhost:8765"
+
+[observability]
+enabled = true
+
+# Rahasia — JANGAN ditulis di file ini:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put TEAM_KEY
