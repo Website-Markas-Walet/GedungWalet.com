@@ -257,9 +257,16 @@ export function drawFloor(m, i, o = {}) {
     (o.cables.runs || []).forEach(r => {
       C.push(`<polyline points="${r.pts.map(([px, py]) => `${X(px)},${Y(py)}`).join(' ')}" fill="none" stroke="${r.warna}" stroke-width="1.8" stroke-opacity="${r.on === false ? 0.25 : 0.9}" stroke-linejoin="round" stroke-linecap="round"${r.on === false ? ' stroke-dasharray="3 4"' : ''}/>`);
     });
+    // keterangan ujung kabel: titik "ujung" di tweeter terakhir tiap jalur; R = titik naik-turun ke ruang audio
+    (o.cables.ends || []).forEach(e2 => {
+      const ex2 = X(e2.x), ey2 = Y(e2.y);
+      C.push(`<circle cx="${ex2}" cy="${ey2}" r="4.5" fill="${e2.warna}" stroke="#fff" stroke-width="1.4"/>`
+        + (s >= 26 ? `<text x="${f1(ex2 + 7)}" y="${f1(ey2 + 3.5)}" font-size="9" font-weight="700" fill="${e2.warna}" stroke="#fff" stroke-width="2.6" paint-order="stroke" font-family="Roboto, Arial, sans-serif">ujung</text>` : ''));
+    });
     if (o.cables.riser) {
       const rx = X(o.cables.riser.x), ry = Y(o.cables.riser.y);
       C.push(`<circle cx="${rx}" cy="${ry}" r="7" fill="#fff" stroke="#37474F" stroke-width="1.6"/><text x="${rx}" y="${f1(ry + 3.4)}" font-size="9" font-weight="700" text-anchor="middle" fill="#37474F" font-family="Roboto, Arial, sans-serif">R</text>`);
+      if (o.cables.riserTxt && s >= 22) C.push(`<text x="${f1(rx + 11)}" y="${f1(ry - 8)}" font-size="9.5" font-weight="700" fill="#37474F" stroke="#fff" stroke-width="2.6" paint-order="stroke" font-family="Roboto, Arial, sans-serif">${esc(o.cables.riserTxt)}</text>`);
     }
     out.push(`<g pointer-events="none">${C.join('')}</g>`);
   }

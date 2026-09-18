@@ -48,6 +48,39 @@ function gridOf(m, fl) {
   const free = k => { if (!blk[k]) return k; for (const d of [1, -1, nx, -nx, 2, -2, 2 * nx, -2 * nx]) { const q = k + d; if (q >= 0 && q < blk.length && !blk[q]) return q; } return k; };
   return { F, cs, nx, ny, blk, cell, free };
 }
+// Segmen lurus bebas sekat bata? (dicek dengan sampel tiap 12 cm)
+function freeSeg(g, a, b) {
+  const L = Math.hypot(b.x - a.x, b.y - a.y);
+  for (let d = 0; d <= L; d += 0.12) {
+    const x = a.x + ((b.x - a.x) * d) / (L || 1), y = a.y + ((b.y - a.y) * d) / (L || 1);
+    const i = Math.floor((x - g.F.x) / g.cs), j = Math.floor((y - g.F.y) / g.cs);
+    if (i >= 0 && j >= 0 && i < g.nx && j < g.ny && g.blk[j * g.nx + i]) return false;
+  }
+  return true;
+}
+// Jalur RAPI antar dua titik: lurus bila segaris, kalau tidak belok SATU sudut siku (L) — seperti instalasi asli.
+// Hanya bila kedua lengan L terhalang bata, cari jalan memutar dengan BFS.
+function lRoute(g, a, b) {
+  if (Math.abs(a.x - b.x) < 0.02 || Math.abs(a.y - b.y) < 0.02) {
+    if (freeSeg(g, a, b)) return { len: Math.abs(a.x - b.x) + Math.abs(a.y - b.y), pts: [[a.x, a.y], [b.x, b.y]], tembus: false };
+  }
+  for (const via of [{ x: b.x, y: a.y }, { x: a.x, y: b.y }]) {
+    if (freeSeg(g, a, via) && freeSeg(g, via, b)) return { len: Math.abs(a.x - b.x) + Math.abs(a.y - b.y), pts: [[a.x, a.y], [via.x, via.y], [b.x, b.y]], tembus: false };
+  }
+  return route(g, a, b);
+}
+// buang titik segaris agar polyline bersih
+function rapikan(pts) {
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [ax, ay] = out[out.length - 1], [bx, by] = pts[i], [cx2, cy2] = pts[i + 1];
+    if ((Math.abs(ax - bx) < 0.01 && Math.abs(bx - cx2) < 0.01) || (Math.abs(ay - by) < 0.01 && Math.abs(by - cy2) < 0.01)) continue;
+    if (Math.abs(ax - bx) < 0.01 && Math.abs(ay - by) < 0.01) continue;
+    out.push(pts[i]);
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
 // Jalur siku terpendek antar dua titik (BFS 4 arah). Kembali {len, pts (sudut belok saja), tembus (terpaksa lewat bata)}.
 function route(g, a, b) {
   const { nx, ny, cs, blk, F } = g, s = g.free(g.cell(a.x, a.y).reduce((i, j) => j * nx + i)), e = g.free(g.cell(b.x, b.y).reduce((i, j) => j * nx + i));
@@ -129,7 +162,9 @@ export function cableInfo(m) {
           const [ax, ay] = man[q - 1], [bx, by] = man[q], L = Math.hypot(bx - ax, by - ay) || 1e-9;
           for (let d2 = 0.08; d2 < L; d2 += 0.15) if (blkAt(ax + ((bx - ax) * d2) / L, ay + ((by - ay) * d2) / L)) { tembus = true; break; }
         }
-        runs.push({ f: li, pts: man.map(p => [p[0], p[1]]), manual: true });
+        const e0 = man[0], e1 = man[man.length - 1];
+        const jauh = Math.abs(e1[0] - riser.x) + Math.abs(e1[1] - riser.y) >= Math.abs(e0[0] - riser.x) + Math.abs(e0[1] - riser.y) ? e1 : e0;
+        runs.push({ f: li, pts: man.map(p => [p[0], p[1]]), manual: true, ujung: [jauh[0], jauh[1]] });
         return;
       }
       const rs = { x: clamp(riser.x, g.F.x + 0.2, g.F.x + g.F.w - 0.2), y: clamp(riser.y, g.F.y + 0.2, g.F.y + g.F.h - 0.2) };
@@ -138,9 +173,9 @@ export function cableInfo(m) {
         const grp = ord.slice(k * per, (k + 1) * per);
         if (!grp.length) continue;
         let prev = rs; const pts = [[rs.x, rs.y]];
-        grp.forEach(p => { const r = route(g, prev, p); len += r.len; tembus = tembus || r.tembus; pts.push(...r.pts.slice(1)); prev = p; });
+        grp.forEach(p => { const r = lRoute(g, prev, p); len += r.len; tembus = tembus || r.tembus; pts.push(...r.pts.slice(1)); prev = p; });
         len += base[li] + 1.2;                                                   // turun riser ke ampli + slack
-        runs.push({ f: li, pts });
+        runs.push({ f: li, pts: rapikan(pts), ujung: [grp[grp.length - 1].x, grp[grp.length - 1].y] });
       }
       if (ch.t === 'hexa') {
         // hexagonal di atap: naik setinggi gedung (+ menara) dari riser lalu mendatar di atap

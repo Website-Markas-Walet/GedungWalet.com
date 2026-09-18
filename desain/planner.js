@@ -34,6 +34,7 @@ let model = null, cur = 0, tool = 'select', view = '2d', three = null, drag = nu
 let sel = new Set();                                   // id objek & sekat terpilih (boleh banyak)
 let undoStack = [], redoStack = [];
 let spaceDown = false, measures = [], luxOn = false, luxRes = null, airOn = false, dbOn = false, kabelOn = false, mark = null, pendRute = null;
+let hidCh = new Set(), kabelSemua = false, lblOn = true;   // sembunyikan jalur per channel · daftar channel semua/lantai ini · keterangan ruang
 let catTab = 'katalog', hid = new Set(), focus = null, openT = new Set();   // daftar item: disembunyikan / fokus (tidak ikut desain)
 // kartu panel kanan yang dilipat (judul sebelum "—"); tersimpan per perangkat agar panel tidak menumpuk
 let closedCards = new Set(['Sketsa tangan', 'Papan sirip', 'Ukuran gedung', 'Penggaris', 'Ruang dari sekat', 'Lokasi (satelit)']);
@@ -217,11 +218,13 @@ function renderCatalog() {
       : `Klik di denah untuk meletakkan ${it.name}`);
   });
 }
-// Daftar item lantai aktif: sembunyikan / tampilkan per jenis atau per item, dan fokus pada satu jenis / item (yang lain
-// diredupkan) — untuk menjelaskan desain. Hanya tampilan: tidak mengubah desain dan tidak ikut link.
+// Daftar item lantai aktif: sembunyikan / tampilkan per jenis atau per item — berlaku SEMUA LANTAI ('T:t') atau hanya
+// lantai tertentu ('T:t#f'), plus fokus pada satu jenis / item. Hanya tampilan: tidak mengubah desain dan tidak ikut link.
 const LIST_ORDER = CATALOG.flatMap(g => g.items.map(it => it.t));
+let hidScope = 'semua';   // cakupan tombol mata pada grup: 'semua' lantai atau 'lantai' aktif saja
+const tHid = t => hid.has('T:' + t) || hid.has(`T:${t}#${cur}`);
 function showOf(o) {
-  if (hid.has(o.id) || hid.has('T:' + o.t)) return 0;
+  if (hid.has(o.id) || tHid(o.t)) return 0;
   return !focus || focus === o.id || focus === 'T:' + o.t ? 1 : 0.14;
 }
 const objOf = id => { const it = findItem(id); if (it) return it; return findWall(id) ? { t: 'sekat', id } : { t: '', id }; };
@@ -243,18 +246,31 @@ function listHTML() {
   });
   if (model.menara && cur === model.floors.length - 1) groups.push({ t: 'menara', name: 'Tapak menara', els: [] });
   const eye = (key, off) => `<button type="button" class="eye${off ? ' off' : ''}" data-hide="${key}" title="${off ? 'Tampilkan' : 'Sembunyikan'}">${icon(off ? 'eyeoff' : 'eye', 15)}</button>`;
+  const eyeT = (t, off) => `<button type="button" class="eye${off ? ' off' : ''}" data-hidet="${t}" title="${off ? 'Tampilkan' : hidScope === 'lantai' ? 'Sembunyikan di lantai ini' : 'Sembunyikan di semua lantai'}">${icon(off ? 'eyeoff' : 'eye', 15)}</button>`;
   const fc = key => `<button type="button" class="fc${focus === key ? ' on' : ''}" data-focus="${key}" title="${focus === key ? 'Keluar dari fokus' : 'Fokus — redupkan yang lain'}">${icon('focus', 15)}</button>`;
   const fname = !focus ? '' : focus.startsWith('T:') ? (groups.find(g => 'T:' + g.t === focus)?.name || 'jenis ini') : (groups.flatMap(g => g.els).find(e => e.id === focus)?.label || 'item');
-  return `<div class="lst">${focus || hid.size ? `<div class="fbar"><span>${focus ? `Fokus: <b>${esc(fname)}</b>` : `${hid.size} disembunyikan`}</span><button type="button" id="lsAll">Tampilkan semua</button></div>` : ''}
+  return `<div class="lst">
+    <div class="scoperow">Mata berlaku untuk <select id="lsScope"><option value="semua"${hidScope === 'semua' ? ' selected' : ''}>semua lantai</option><option value="lantai"${hidScope === 'lantai' ? ' selected' : ''}>lantai ini saja</option></select></div>
+    <div class="lg${lblOn ? '' : ' off'}"><button type="button" class="eye${lblOn ? '' : ' off'}" data-lbl title="${lblOn ? 'Sembunyikan keterangan nama ruang' : 'Tampilkan keterangan nama ruang'}">${icon(lblOn ? 'eye' : 'eyeoff', 15)}</button><span class="lgn" style="cursor:default">Keterangan nama ruang</span></div>
+    ${kabelOn ? `<div class="lg"><span style="width:26px"></span><span class="lgn" style="cursor:default">Jalur kabel: mata per channel ada di panel kanan</span></div>` : ''}
+    ${focus || hid.size ? `<div class="fbar"><span>${focus ? `Fokus: <b>${esc(fname)}</b>` : `${hid.size} disembunyikan`}</span><button type="button" id="lsAll">Tampilkan semua</button></div>` : ''}
     ${groups.length ? groups.map(g => {
-      const key = 'T:' + g.t, off = hid.has(key), open = openT.has(g.t) && g.els.length;
-      return `<div class="lg${off ? ' off' : ''}">${eye(key, off)}<button type="button" class="lgn" data-open="${g.t}">${symbolSVG(g.t, 22)}<span>${g.name}</span><small>${g.els.length || ''}</small>${g.els.length ? `<i>${open ? '▾' : '▸'}</i>` : ''}</button>${fc(key)}</div>`
+      const off = tHid(g.t), open = openT.has(g.t) && g.els.length;
+      return `<div class="lg${off ? ' off' : ''}">${eyeT(g.t, off)}<button type="button" class="lgn" data-open="${g.t}">${symbolSVG(g.t, 22)}<span>${g.name}</span><small>${g.els.length || ''}</small>${g.els.length ? `<i>${open ? '▾' : '▸'}</i>` : ''}</button>${fc('T:' + g.t)}</div>`
         + (open ? g.els.map(e => `<div class="li${sel.has(e.id) ? ' on' : ''}${hid.has(e.id) || off ? ' off' : ''}">${eye(e.id, hid.has(e.id))}<button type="button" class="lin" data-pick="${e.id}">${esc(e.label)}${e.locked ? ' · terkunci' : ''}</button>${fc(e.id)}</div>`).join('') : '');
     }).join('') : '<p class="tip">Belum ada elemen di lantai ini.</p>'}
-    <p class="tip">Ikon mata = sembunyikan / tampilkan. Ikon fokus = hanya jenis atau item itu yang jelas, lainnya diredupkan — cocok saat menjelaskan desain. Klik nama item untuk memilihnya. Hanya tampilan, desain tidak berubah.</p></div>`;
+    <p class="tip">Ikon mata = sembunyikan / tampilkan (pilih cakupannya di atas: semua lantai / lantai ini). Ikon fokus = hanya jenis atau item itu yang jelas, lainnya diredupkan — cocok saat menjelaskan desain. Hanya tampilan, desain tidak berubah.</p></div>`;
 }
 function bindList() {
   const C = $('#catalog');
+  const sc = C.querySelector('#lsScope'); if (sc) sc.onchange = () => { hidScope = sc.value; renderCatalog(); };
+  const lb = C.querySelector('[data-lbl]'); if (lb) lb.onclick = () => { lblOn = !lblOn; refreshView(); };
+  C.querySelectorAll('[data-hidet]').forEach(b => b.onclick = () => {   // mata per JENIS: cakupan semua lantai / lantai ini
+    const t = b.dataset.hidet, g = 'T:' + t, f = `T:${t}#${cur}`;
+    if (tHid(t)) { hid.delete(g); [...hid].forEach(k => { if (k.startsWith('T:' + t + '#')) hid.delete(k); }); }
+    else { hid.add(hidScope === 'lantai' ? f : g); if (focus === g) focus = null; }
+    [...sel].forEach(id => { if (!showOf(objOf(id))) sel.delete(id); }); refreshView();
+  });
   C.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
     const k = b.dataset.hide; if (hid.has(k)) hid.delete(k); else { hid.add(k); if (focus === k) focus = null; }
     [...sel].forEach(id => { if (!showOf(objOf(id))) sel.delete(id); }); refreshView();
@@ -262,7 +278,7 @@ function bindList() {
   C.querySelectorAll('[data-focus]').forEach(b => b.onclick = () => { const k = b.dataset.focus; focus = focus === k ? null : k; hid.delete(k); refreshView(); });
   C.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { const t = b.dataset.open; if (openT.has(t)) openT.delete(t); else openT.add(t); renderCatalog(); });
   C.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
-    const id = b.dataset.pick, o = objOf(id); hid.delete(id); hid.delete('T:' + o.t);
+    const id = b.dataset.pick, o = objOf(id); hid.delete(id); hid.delete('T:' + o.t); hid.delete(`T:${o.t}#${cur}`);
     if (focus && showOf(o) < 1) focus = null;
     sel = new Set([id]); refreshView();
   });
@@ -388,13 +404,18 @@ function dbLabels() {
 }
 function cableRuns() {
   let cb; try { cb = cableInfo(model); } catch { return null; }
-  const runs = cb.chs.flatMap(c => c.runs.filter(r => r.f === cur).map(r => ({ warna: c.warna, pts: r.pts, on: c.on })));
+  const tampil = cb.chs.filter(c => !hidCh.has(c.id));
+  const runs = tampil.flatMap(c => c.runs.filter(r => r.f === cur).map(r => ({ warna: c.warna, pts: r.pts, on: c.on })));
+  // keterangan ujung: tweeter terakhir tiap jalur ditandai "ujung"
+  const ends = tampil.flatMap(c => c.runs.filter(r => r.f === cur && !r.drop && r.ujung).map(r => ({ x: r.ujung[0], y: r.ujung[1], warna: c.warna })));
   // sambungan riser → ruang audio (semua kabel dari RBW berujung & tersambung ke ruang audio)
   if (cb.au && cb.au.li === cur) {
     const ac = center(cb.au.it);
     runs.push({ warna: '#455A64', pts: [[cb.riser.x, cb.riser.y], [ac.x, cb.riser.y], [ac.x, ac.y]], on: true });
   }
-  return { runs, riser: cb.riser };
+  const LVn = levels(model);
+  const riserTxt = cb.au ? (cb.au.li === cur ? '→ ruang audio' : `↕ ke ${LVn[cb.au.li]?.name || 'Lantai 1'} → ruang audio`) : '↕ turun ke pojok gedung';
+  return { runs, ends, riser: cb.riser, riserTxt };
 }
 function renderPlan() {
   const r = svg.getBoundingClientRect(); if (!r.width || !model) return;
@@ -408,7 +429,7 @@ function renderPlan() {
     s: vp.s, ox: vp.ox, oy: vp.oy, pfx: 'pl', interactive: true, sel, grid: 'canvas', vw: r.width, vh: r.height, dims: true, ghost: true, chain: !luxOn, der,
     preview: drag?.mode === 'wall' ? drag : null, sketch: sk && sk.show !== false ? { ...sk, href: SK.sketchHref(sk) } : null,
     heat: lf ? { href: heatURL(L, cur), x: lf.F.x, y: lf.F.y, w: lf.nx * lf.cs, h: lf.ny * lf.cs } : null,
-    luxLabels: lf ? luxLabels(L, lf) : dbOn && !drag ? dbLabels() : null,
+    luxLabels: lf ? luxLabels(L, lf) : dbOn && !drag ? dbLabels() : null, labels: lblOn,
     measures: ms, marquee: drag?.mode === 'marquee' ? drag : null, flow: lf ? L.flow[cur] : null, link: drag?.mode === 'link' ? drag : null,
     show: showOf, air: airOn ? airArrows() : null, cables: kabelOn && !drag ? cableRuns() : null,
     site: site?.src ? siteDraw() : null,
@@ -1111,18 +1132,23 @@ function dbCard() {
 // Kabel tiap channel + klem (mode "Kabel").
 function kabelCard() {
   let cb; try { cb = cableInfo(model); } catch (e) { console.error('kabel', e); return ''; }
-  const rows = cb.chs.map(c => {
-    const manual = !!model.kabel?.rute?.[c.id]?.[cur], bisa = c.t !== 'hexa' && chCover(c, cur);
-    return `<tr><td><span class="lxdot" style="background:${c.warna}"></span>${esc(c.nm)}${c.on === false ? ' <small>(cek: mati)</small>' : ''}${c.tembus ? '<br><small class="bad">menembus/terkurung bata!</small>' : ''}
-      ${bisa ? `<br><button type="button" class="mini" data-rt="${c.id}">✏️ ${manual ? 'Gambar ulang' : 'Jalur manual'} Lt ini</button>${manual ? ` <button type="button" class="mini" data-rtdel="${c.id}" title="Hapus jalur manual lantai ini — kembali otomatis">🗑</button>` : ''}` : ''}</td>
-      <td>${c.count}</td><td>${fmt(Math.round(c.len))} m${manual ? ' <small>✏️</small>' : ''}</td><td>${fmt(c.klem)}</td></tr>`;
+  const daftar = cb.chs.filter(c => kabelSemua || chCover(c, cur) || model.kabel?.rute?.[c.id]?.[cur]);
+  const rows = daftar.map(c => {
+    const manual = !!model.kabel?.rute?.[c.id]?.[cur], bisa = c.t !== 'hexa' && chCover(c, cur), off = hidCh.has(c.id);
+    return `<tr${off ? ' style="opacity:.45"' : ''}><td><button type="button" class="eye2${off ? ' off' : ''}" data-che="${c.id}" title="${off ? 'Tampilkan' : 'Sembunyikan'} jalur channel ini di denah">${icon(off ? 'eyeoff' : 'eye', 13)}</button><span class="lxdot" style="background:${c.warna}"></span>${esc(c.nm)}${c.on === false ? ' <small>(cek: mati)</small>' : ''}${manual ? ' ✏️' : ''}
+      ${bisa ? `<button type="button" class="mini icb" data-rt="${c.id}" title="${manual ? 'Gambar ulang' : 'Gambar'} jalur kabel sendiri di lantai ini (klik titik-titik, Enter selesai)">✏️</button>` : ''}${manual ? `<button type="button" class="mini icb" data-rtdel="${c.id}" title="Hapus jalur manual lantai ini — kembali otomatis">🗑</button>` : ''}
+      ${c.tembus ? '<br><small class="bad">menembus/terkurung bata!</small>' : ''}</td>
+      <td>${c.count}</td><td>${fmt(Math.round(c.len))} m</td><td>${fmt(c.klem)}</td></tr>`;
   }).join('');
+  const sisa = cb.chs.length - daftar.length;
   return `<div class="card"><h4>${icon('cable', 14)} Kabel tweeter → ruang audio</h4>
     ${rowInfo('Ruang audio', cb.au ? (cb.luar ? 'di luar gedung ✓' : levels(model)[cb.au.li].name) : '<span class="bad">belum ada</span> — dihitung dari pojok gedung')}
+    <label class="chkrow"><input type="checkbox" id="kbAll"${kabelSemua ? ' checked' : ''}> Tampilkan semua channel (bukan hanya ${floor().name})</label>
     <table class="luxt t4"><tr class="fl"><td>Channel</td><td>Tw</td><td>Kabel</td><td>Klem</td></tr>${rows}</table>
-    ${rowInfo('Total kabel', `<b>${fmt(Math.round(cb.total))} m</b>`)}${rowInfo('Total klem (tiap 10 cm)', `<b>${fmt(cb.klem)}</b>`)}
+    ${sisa > 0 ? `<p class="tip">${sisa} channel lantai lain disembunyikan dari daftar — centang di atas untuk melihat semuanya.</p>` : ''}
+    ${rowInfo('Total kabel (semua channel)', `<b>${fmt(Math.round(cb.total))} m</b>`)}${rowInfo('Total klem (tiap 10 cm)', `<b>${fmt(cb.klem)}</b>`)}
     <div class="acts"><button type="button" id="kbAudio">${icon('audio', 14)} Atur channel</button></div>
-    <p class="tip">Jalur otomatis selalu siku mengikuti alur sirip / dinding; boleh menembus terpal, tidak menembus bata; R = titik naik-turun antar lantai, lalu tersambung ke ruang audio (garis abu-abu). Tombol ✏️ = gambar jalur kabel SENDIRI untuk lantai aktif (klik titik-titik, Enter selesai) — panjang & klem mengikuti jalur gambar Anda + sambungan tiap tweeter. Kabel hexagonal otomatis naik setinggi gedung + menara. Belum termasuk cadangan ±10%.</p></div>`;
+    <p class="tip">Jalur otomatis kini rapi: lurus sepanjang baris tweeter, belok satu SUDUT siku antar baris (memutar hanya bila terhalang bata); titik berlabel <b>ujung</b> = tweeter terakhir jalur; <b>R</b> = titik naik-turun antar lantai lalu tersambung ke ruang audio (garis abu-abu). Ikon mata = sembunyikan jalur channel itu di denah. ✏️ = gambar jalur sendiri untuk lantai aktif. Kabel hexagonal otomatis naik setinggi gedung + menara. Belum termasuk cadangan ±10%.</p></div>`;
 }
 // gambar / hapus jalur kabel manual channel untuk lantai aktif
 function startRute(id) {
@@ -1282,6 +1308,12 @@ function projectPanel() {
   ['dbAudio', 'kbAudio'].forEach(id => { const b = $('#' + id); if (b) b.onclick = () => D.dlgAudio(); });
   $('#props').querySelectorAll('[data-rt]').forEach(b => b.onclick = () => startRute(b.dataset.rt));
   $('#props').querySelectorAll('[data-rtdel]').forEach(b => b.onclick = () => delRute(b.dataset.rtdel));
+  $('#props').querySelectorAll('[data-che]').forEach(b => b.onclick = () => {   // sembunyikan / tampilkan jalur channel di denah
+    const id = b.dataset.che;
+    if (hidCh.has(id)) hidCh.delete(id); else hidCh.add(id);
+    renderPlan(); renderSide(false);
+  });
+  const ka = $('#kbAll'); if (ka) ka.onchange = () => { kabelSemua = ka.checked; renderSide(false); };
   $('#props').querySelectorAll('tr.fl[data-f]').forEach(tr => { if (!tr.onclick) tr.onclick = () => goLevel(+tr.dataset.f); });
   $('#props').querySelectorAll('[data-inap]').forEach(b => b.onclick = () => makeInap(+b.dataset.inap));
 }
