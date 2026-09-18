@@ -133,7 +133,7 @@ export function cableInfo(m) {
   const grids = LV.map(fl => gridOf(m, fl));
   const rute = m.kabel?.rute || {};
   const chs = channels(m).map(ch => {
-    let len = 0, tembus = false, count = 0;
+    let len = 0, tembus = false, count = 0, kosong = 0;
     const runs = [];
     LV.forEach((fl, li) => {
       if (!chCover(ch, li)) return;
@@ -141,9 +141,11 @@ export function cableInfo(m) {
       if (!tws.length) return;
       count += tws.length;
       const g = grids[li];
-      // jalur manual (digambar pengguna): panjang = jalur + sambungan siku tiap tweeter ke jalur + riser
+      // jalur manual (digambar pengguna): panjang = jalur + sambungan siku tiap tweeter ke jalur + riser.
+      // [] (kosong) = jalur otomatis DIHAPUS — tidak digambar & tidak dihitung sampai pengguna menggambar sendiri.
       const man = ch.t !== 'hexa' ? rute[ch.id]?.[li] : null;
-      if (Array.isArray(man) && man.length >= 2) {
+      if (Array.isArray(man) && man.length < 2) { kosong++; return; }
+      if (Array.isArray(man)) {
         let trunk = 0;
         for (let q = 1; q < man.length; q++) trunk += Math.abs(man[q][0] - man[q - 1][0]) + Math.abs(man[q][1] - man[q - 1][1]);
         tws.forEach(t => {
@@ -186,7 +188,7 @@ export function cableInfo(m) {
     });
     len += luarRun * Math.max(1, ch.n);
     const klem = Math.ceil(len / RULES.klemJarak);
-    return { ...ch, len: r1(len), klem, runs, count, tembus };
+    return { ...ch, len: r1(len), klem, runs, count, tembus, kosong };
   }).filter(c => c.count);
   const total = r1(chs.reduce((s, c) => s + c.len, 0)), klem = chs.reduce((s, c) => s + c.klem, 0);
   const res = { chs, total, klem, riser, au, luar: !!au && (() => { const F = floorRect(m, LV[au.li]), c = center(au.it); return c.x < F.x || c.x > F.x + F.w || c.y < F.y || c.y > F.y + F.h; })() };

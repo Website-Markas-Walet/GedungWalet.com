@@ -405,7 +405,7 @@ function dbLabels() {
 function cableRuns() {
   let cb; try { cb = cableInfo(model); } catch { return null; }
   const tampil = cb.chs.filter(c => !hidCh.has(c.id));
-  const runs = tampil.flatMap(c => c.runs.filter(r => r.f === cur).map(r => ({ warna: c.warna, pts: r.pts, on: c.on })));
+  const runs = tampil.flatMap(c => c.runs.filter(r => r.f === cur && r.pts).map(r => ({ warna: c.warna, pts: r.pts, on: c.on })));
   // keterangan ujung: tweeter terakhir tiap jalur ditandai "ujung"
   const ends = tampil.flatMap(c => c.runs.filter(r => r.f === cur && !r.drop && r.ujung).map(r => ({ x: r.ujung[0], y: r.ujung[1], warna: c.warna })));
   // sambungan riser → ruang audio (semua kabel dari RBW berujung & tersambung ke ruang audio)
@@ -1134,9 +1134,14 @@ function kabelCard() {
   let cb; try { cb = cableInfo(model); } catch (e) { console.error('kabel', e); return ''; }
   const daftar = cb.chs.filter(c => kabelSemua || chCover(c, cur) || model.kabel?.rute?.[c.id]?.[cur]);
   const rows = daftar.map(c => {
-    const manual = !!model.kabel?.rute?.[c.id]?.[cur], bisa = c.t !== 'hexa' && chCover(c, cur), off = hidCh.has(c.id);
+    const r0 = model.kabel?.rute?.[c.id]?.[cur];
+    const kosongF = Array.isArray(r0) && r0.length < 2, manual = Array.isArray(r0) && r0.length >= 2;
+    const bisa = c.t !== 'hexa' && chCover(c, cur), off = hidCh.has(c.id);
     return `<tr${off ? ' style="opacity:.45"' : ''}><td><button type="button" class="eye2${off ? ' off' : ''}" data-che="${c.id}" title="${off ? 'Tampilkan' : 'Sembunyikan'} jalur channel ini di denah">${icon(off ? 'eyeoff' : 'eye', 13)}</button><span class="lxdot" style="background:${c.warna}"></span>${esc(c.nm)}${c.on === false ? ' <small>(cek: mati)</small>' : ''}${manual ? ' ✏️' : ''}
-      ${bisa ? `<button type="button" class="mini icb" data-rt="${c.id}" title="${manual ? 'Gambar ulang' : 'Gambar'} jalur kabel sendiri di lantai ini (klik titik-titik, Enter selesai)">✏️</button>` : ''}${manual ? `<button type="button" class="mini icb" data-rtdel="${c.id}" title="Hapus jalur manual lantai ini — kembali otomatis">🗑</button>` : ''}
+      ${bisa ? `<button type="button" class="mini icb" data-rt="${c.id}" title="${manual ? 'Gambar ulang' : 'Gambar'} jalur kabel sendiri di lantai ini (klik titik-titik, Enter selesai)">✏️</button>` : ''}
+      ${bisa && !manual && !kosongF ? `<button type="button" class="mini icb" data-rtoff="${c.id}" title="Hapus jalur otomatis lantai ini — kosongkan supaya benar-benar digambar manual">⨯</button>` : ''}
+      ${(manual || kosongF) ? `<button type="button" class="mini icb" data-rtdel="${c.id}" title="${manual ? 'Hapus jalur manual lantai ini — kembali otomatis' : 'Kembalikan jalur otomatis lantai ini'}">${manual ? '🗑' : '↩'}</button>` : ''}
+      ${kosongF ? '<br><small class="bad">jalur otomatis dihapus — belum digambar manual (✏️); belum dihitung</small>' : ''}
       ${c.tembus ? '<br><small class="bad">menembus/terkurung bata!</small>' : ''}</td>
       <td>${c.count}</td><td>${fmt(Math.round(c.len))} m</td><td>${fmt(c.klem)}</td></tr>`;
   }).join('');
@@ -1148,7 +1153,7 @@ function kabelCard() {
     ${sisa > 0 ? `<p class="tip">${sisa} channel lantai lain disembunyikan dari daftar — centang di atas untuk melihat semuanya.</p>` : ''}
     ${rowInfo('Total kabel (semua channel)', `<b>${fmt(Math.round(cb.total))} m</b>`)}${rowInfo('Total klem (tiap 10 cm)', `<b>${fmt(cb.klem)}</b>`)}
     <div class="acts"><button type="button" id="kbAudio">${icon('audio', 14)} Atur channel</button></div>
-    <p class="tip">Jalur otomatis kini rapi: lurus sepanjang baris tweeter, belok satu SUDUT siku antar baris (memutar hanya bila terhalang bata); titik berlabel <b>ujung</b> = tweeter terakhir jalur; <b>R</b> = titik naik-turun antar lantai lalu tersambung ke ruang audio (garis abu-abu). Ikon mata = sembunyikan jalur channel itu di denah. ✏️ = gambar jalur sendiri untuk lantai aktif. Kabel hexagonal otomatis naik setinggi gedung + menara. Belum termasuk cadangan ±10%.</p></div>`;
+    <p class="tip">Jalur otomatis rapi: lurus sepanjang baris tweeter, belok satu SUDUT siku antar baris; titik <b>ujung</b> = tweeter terakhir jalur; <b>R</b> = naik-turun antar lantai → ruang audio (garis abu-abu). Ikon mata = sembunyikan jalur channel. ✏️ = gambar jalur sendiri untuk lantai aktif. <b>⨯ = hapus jalur otomatis</b> (kosong, tidak dihitung) supaya benar-benar dibuat manual; ↩ mengembalikannya. Kabel hexagonal otomatis naik setinggi gedung + menara. Belum termasuk cadangan ±10%.</p></div>`;
 }
 // gambar / hapus jalur kabel manual channel untuk lantai aktif
 function startRute(id) {
@@ -1171,12 +1176,22 @@ function finishRute() {
   hint('Jalur kabel manual tersimpan — panjang & klem dihitung dari jalur ini (ikut link desain).', 7000);
 }
 function delRute(id) {
-  const r = model.kabel?.rute; if (!r?.[id]?.[cur]) return;
+  const r = model.kabel?.rute; if (!r?.[id] || !(cur in r[id])) return;
+  const manual = Array.isArray(r[id][cur]) && r[id][cur].length >= 2;
   commit();
   delete r[id][cur];
   if (!Object.keys(r[id]).length) delete r[id];
   if (!Object.keys(r).length) delete model.kabel.rute;
-  save(); renderAll(); hint('Jalur manual dihapus — kembali ke rute otomatis.');
+  save(); renderAll(); hint(manual ? 'Jalur manual dihapus — kembali ke rute otomatis.' : 'Jalur otomatis dikembalikan.');
+}
+// hapus jalur OTOMATIS lantai ini (kosongkan) — supaya benar-benar dibuat manual dari nol
+function rtOff(id) {
+  commit();
+  if (!model.kabel?.ch?.length) model.kabel = { ...(model.kabel || {}), ch: channels(model).map(({ warna, ...c }) => ({ ...c })) };
+  model.kabel.rute = model.kabel.rute || {};
+  (model.kabel.rute[id] = model.kabel.rute[id] || {})[cur] = [];
+  save(); renderAll();
+  hint('Jalur otomatis dihapus untuk lantai ini (tidak digambar & tidak dihitung) — tekan ✏️ untuk menggambar jalur manual Anda.', 8000);
 }
 // Foto satelit lokasi (Google Maps) sebagai latar denah.
 const stFile = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*', hidden: true });
@@ -1308,6 +1323,7 @@ function projectPanel() {
   ['dbAudio', 'kbAudio'].forEach(id => { const b = $('#' + id); if (b) b.onclick = () => D.dlgAudio(); });
   $('#props').querySelectorAll('[data-rt]').forEach(b => b.onclick = () => startRute(b.dataset.rt));
   $('#props').querySelectorAll('[data-rtdel]').forEach(b => b.onclick = () => delRute(b.dataset.rtdel));
+  $('#props').querySelectorAll('[data-rtoff]').forEach(b => b.onclick = () => rtOff(b.dataset.rtoff));
   $('#props').querySelectorAll('[data-che]').forEach(b => b.onclick = () => {   // sembunyikan / tampilkan jalur channel di denah
     const id = b.dataset.che;
     if (hidCh.has(id)) hidCh.delete(id); else hidCh.add(id);

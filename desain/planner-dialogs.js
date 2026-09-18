@@ -442,7 +442,7 @@ export function parseShare(hash) {
         Object.entries(byF).slice(0, 10).forEach(([li, pts]) => {
           if (!/^\d$/.test(li) || !Array.isArray(pts)) return;
           const p2 = pts.slice(0, 60).map(p3 => (Array.isArray(p3) ? [num(p3[0], -8, W + 8), num(p3[1], -8, H + 8)] : null)).filter(Boolean);
-          if (p2.length >= 2) o2[li] = p2;
+          o2[li] = p2.length >= 2 ? p2 : [];   // [] = jalur otomatis dihapus (murni manual, belum digambar)
         });
         if (Object.keys(o2).length) rute[id2] = o2;
       });
