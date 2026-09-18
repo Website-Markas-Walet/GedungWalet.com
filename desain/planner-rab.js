@@ -22,7 +22,7 @@ const DEF = [
   ['pintu', 'Pintu baja kunci ganda', 'bh', 1500000, ''],
   ['polesan', 'Sarang polesan (cetakan)', 'bh', 10000, ''],
 ];
-const ALAT_HARGA = { axm: 2500000, piro88: 1800000, piro89: 2000000, kipas: 100000, timerKitani: 150000, timerAC: 120000, saklar: 30000, stopkontak: 50000, aki: 1200000, flashdisk: 60000, twKontrolT: 35000, twKontrolI: 35000 };
+const ALAT_HARGA = { axm: 2500000, piro88: 1800000, piro89: 2000000, kipas: 100000, timerKitani: 150000, timerAC: 120000, saklar: 30000, stopkontak: 50000, aki: 1200000, flashdisk: 60000, twKontrolT: 35000, twKontrolI: 35000, lampu: 50000 };
 
 export function rabRows(m, a, cab) {
   const H = { ...(m.rab?.h || {}) }, K = { ...(m.rab?.k || {}) };

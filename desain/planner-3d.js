@@ -126,17 +126,22 @@ function box(w, h, d, color, x, y, z, op = 0) {
 }
 function cached(k, make) { if (!geoCache.has(k)) geoCache.set(k, make()); return geoCache.get(k); }
 const cyl = (r, h, color, x, y, z, op) => mesh(cached(`c${r}|${h}`, () => new THREE.CylinderGeometry(r, r, h, 14)), color, x, y, z, op);
-// Tweeter berbentuk corong: mulut lebar ke arah hadap (sumbu +x lokal), leher kecil di belakang.
+// Tweeter gaya Audax AX-65: corong KOTAK (piramida 4 sisi) melebar ke arah hadap (sumbu +x lokal), magnet di belakang.
 function horn(color, x, y, z, dirDeg, op = 0) {
-  const g = cached('corong', () => { const c = new THREE.CylinderGeometry(0.07, 0.022, 0.15, 14, 1, true); c.rotateZ(-Math.PI / 2); return c; });
+  const g = cached('corong65', () => {
+    const c = new THREE.CylinderGeometry(0.085, 0.026, 0.15, 4, 1, true);
+    c.rotateY(Math.PI / 4); c.rotateZ(-Math.PI / 2);
+    return c;
+  });
   const m = mesh(g, color, x, y, z, op, THREE.DoubleSide);
   m.rotation.y = -(dirDeg * Math.PI) / 180;
   return m;
 }
-// Tweeter hexagonal: tiang + segi enam + 6 corong panggil menghadap keluar ke 6 arah.
+// Tweeter hexagonal Audax: tiang + badan segi enam + topi atap + 6 corong panggil menghadap keluar ke 6 arah.
 function hexa(x, y, z, op) {
   cyl(0.025, 0.5, 0x777777, x, y + 0.25, z, op);
   mesh(cached('hexa', () => new THREE.CylinderGeometry(0.2, 0.2, 0.14, 6)), COL.hexa, x, y + 0.56, z, op);
+  mesh(cached('hexaTopi', () => new THREE.CylinderGeometry(0.02, 0.27, 0.1, 6)), 0x1f2328, x, y + 0.68, z, op);   // topi atap khas Audax
   for (let k = 0; k < 6; k++) { const a = k * 60, r = (a * Math.PI) / 180; horn(COL.hexa, x + Math.cos(r) * 0.25, y + 0.56, z + Math.sin(r) * 0.25, a, op); }
 }
 

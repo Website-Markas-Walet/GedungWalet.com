@@ -115,7 +115,7 @@ export function generate(m, answers, onlyFloor = -1) {
     // 4) lantai teratas tanpa menara: LMB 70×50 cm di dinding luar + tarik LMB (menghadap keluar) + hexagonal di atasnya
     if (i === top && !needMenara) {
       const two = RULES.lmbBesarJika(m.w, m.h);
-      const lmb = (x, y, w, h, tx, ty) => { add('lmb', x, y, w, h, { tcm: 50 }); tw('twtarik', tx, ty, { role: 'lmb' }); const hx = add('hexa', x, y, 0.44, 0.44); snapHexa(hx, m, { ...fl, items }); };
+      const lmb = (x, y, w, h, tx, ty) => { add('lmb', x, y, w, h, { tcm: 50, lmbTw: { a: 2, s: 4, b: 0 } }); tw('twtarik', tx, ty, { role: 'lmb' }); const hx = add('hexa', x, y, 0.44, 0.44); snapHexa(hx, m, { ...fl, items }); };
       const touch = { depan: atFront, belakang: atBack, kiri: vx <= X0 + 0.01, kanan: vx + vw >= X1 - 0.01 };
       const place = f => {                                                      // f = posisi relatif sepanjang void
         const py = vy + vh * f, px = vx + vw * f;
@@ -202,7 +202,7 @@ export function generate(m, answers, onlyFloor = -1) {
         const cx = fx + mw / 2, cy = fy + mh / 2;
         const [x, y, w, h, nx, ny] = { depan: [cx - 0.35, fy, 0.7, 0.2, 0, 1], belakang: [cx - 0.35, fy + mh - 0.2, 0.7, 0.2, 0, -1], kiri: [fx, cy - 0.35, 0.2, 0.7, 1, 0], kanan: [fx + mw - 0.2, cy - 0.35, 0.2, 0.7, -1, 0] }[s];
         const wx = x + w / 2 - nx * 0.1, wy = y + h / 2 - ny * 0.1;   // titik di garis dinding menara; (nx, ny) = arah ke dalam
-        put('lmb', x, y, w, h, { tcm: 50 });
+        put('lmb', x, y, w, h, { tcm: 50, lmbTw: { a: 2, s: 4, b: 0 } });
         put('twtarik', wx + nx * 0.45 + (ny ? 0.6 : 0) - TW / 2, wy + ny * 0.45 + (nx ? 0.6 : 0) - TW / 2, TW, TW, { role: 'lmb' });
         put('hexa', wx + nx * 0.42 - 0.22, wy + ny * 0.42 - 0.22, 0.44, 0.44);
       };

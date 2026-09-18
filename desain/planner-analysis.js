@@ -5,7 +5,7 @@ import { derive, center, dist, ovArea, inRect, angDiff, distToRect, siripEfektif
 import { simulate, luxTxt } from './planner-light.js';
 import { climate } from './planner-air.js';
 import { simulateSound, nilaiDb } from './planner-sound.js';
-import { cableInfo } from './planner-cable.js';
+import { cableInfo, channels as kanal, chCover } from './planner-cable.js';   // "channels" dipakai sebagai variabel lokal di bawah
 
 const fmt = n => (+n).toLocaleString('id-ID');
 const r1 = v => Math.round(v * 10) / 10;
@@ -85,6 +85,11 @@ export function analyze(m) {
       if (mt < RULES.menaraTinggi[0] || mt > RULES.menaraTinggi[1]) info(`Tinggi menara ${fmt(mt)} m; buku menyarankan ${RULES.menaraTinggi[0]}–${RULES.menaraTinggi[1]} m.`);
     }
   });
+  // tweeter yang terpasang di sekeliling LMB (tampak depan LMB: a = tarik atas, s+b = inap sisi/bawah)
+  let lmbTwTarik = 0, lmbTwInap = 0;
+  LV.forEach(fl => by(fl, 'lmb').forEach(l => { const q = l.lmbTw || { a: 2, s: 4, b: 0 }; lmbTwTarik += q.a; lmbTwInap += q.s + q.b; }));
+  twtarikN += lmbTwTarik; twinapN += lmbTwInap;
+  if (lmbTwTarik + lmbTwInap) info(`Tweeter di sekeliling LMB: ${lmbTwTarik} tarik + ${lmbTwInap} inap (atur lewat "Tweeter LMB…" di panel LMB) — sudah masuk hitungan total, kabel & RAB.`);
   const hexas = LV.flatMap(fl => by(fl, 'hexa').map(h => ({ h, fl })));
   if (lmbN && !hexas.length) pen(2, 'Belum ada tweeter hexagonal (suara panggil) — pasang mepet di atas LMB (di menara atau lantai ber-LMB).');
   const jauh = hexas.filter(({ h, fl }) => !by(fl, 'lmb').some(l => dist(center(l), center(h)) <= 1.2)).length;
@@ -203,6 +208,12 @@ export function analyze(m) {
     const tembus = kabel.chs.filter(c => c.tembus);
     if (tembus.length) pen(2, `Kabel channel ${tembus.map(c => c.nm).slice(0, 3).join(', ')} terkurung sekat bata — kabel tidak boleh menembus dinding bata; ganti bahan sekat menjadi terpal atau beri jalur.`, 'warn');
     if (!audioN && (twtarikN + twinapN) > 0) info(`Belum ada ruang audio — panjang kabel dihitung dari pojok gedung (${fmt(kabel.total)} m, ${fmt(kabel.klem)} klem).`);
+    // semua tweeter WAJIB tersambung channel ke ruang audio
+    const chs2 = kanal(m), NAMA2 = { twinap: 'tweeter inap', twtarik: 'tweeter tarik', hexa: 'tweeter hexagonal' };
+    LV.forEach((fl, li) => ['twinap', 'twtarik', 'hexa'].forEach(t2 => {
+      const n2 = fl.items.filter(i2 => i2.t === t2).length;
+      if (n2 && !chs2.some(c2 => c2.t === t2 && chCover(c2, li) && c2.on !== false)) pen(2, `${fl.name}: ${n2} ${NAMA2[t2]} belum tersambung channel mana pun ke ruang audio — tambah channel-nya di "Ruang audio".`, 'warn', atF(Math.min(li, top)));
+    }));
   } catch (e) { console.warn('hitung kabel gagal', e); }
 
   // --- titik sarang (pemantauan) ---
