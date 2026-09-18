@@ -2,7 +2,8 @@
 import { CATALOG, TYPES, RULES, TARIK_ROLES, TW, LAR_FUNGSI, ARAH8, LANGIT, SISI, SARANG_JENIS, icon } from './planner-data.js';
 import { climate } from './planner-air.js';
 import { simulateSound, nilaiDb } from './planner-sound.js';
-import { cableInfo } from './planner-cable.js';
+import { cableInfo, channels, chCover } from './planner-cable.js';
+import * as SND from './planner-suara.js';
 import { derive, snapToWall, snapHexa, isLar, center, inRect, twinapRekomendasi, zonePattern, siripDetail, siripVolume, pushOffWalls, snap90, dist, distToRect, angDiff, floorRect, floorHt, clampInto, isFull, ovArea, levels } from './planner-geom.js';
 import { drawFloor, symbolSVG } from './planner-draw.js';
 import { generate } from './planner-auto.js';
@@ -38,6 +39,9 @@ let catTab = 'katalog', hid = new Set(), focus = null, openT = new Set();   // d
 let closedCards = new Set(['Sketsa tangan', 'Papan sirip', 'Ukuran gedung', 'Penggaris', 'Ruang dari sekat', 'Lokasi (satelit)']);
 try { const c = JSON.parse(localStorage.getItem('waletPlanner.cards')); if (Array.isArray(c)) closedCards = new Set(c); } catch {}
 const saveCards = () => { try { localStorage.setItem('waletPlanner.cards', JSON.stringify([...closedCards])); } catch {} };
+// grup katalog kiri yang dilipat (dropdown)
+let catClosed = new Set();
+try { const c = JSON.parse(localStorage.getItem('waletPlanner.catg')); if (Array.isArray(c)) catClosed = new Set(c); } catch {}
 let sig = [];                                          // isi tiap lantai saat terakhir diendapkan (tweeter inap otomatis)
 const vp = { s: 60, ox: 0, oy: 0 };
 
@@ -169,7 +173,7 @@ const app = {
   get model() { return model; }, get cur() { return cur; }, get view() { return view; },
   newModel, commit, save, fit, hint, renderAll, setView, applyProject,
   analyze: () => analyze(model), generate, topSmallRect,
-  setModel(m) { model = normalize(m); cur = model.floors.length - 1; sel.clear(); hid.clear(); focus = null; openT.clear(); tool = 'select'; calib = null; measures = []; undoStack = []; redoStack = []; SK.prune(model); resetSig(); save(); fit(); renderAll(); if (view === '3d') setView('3d'); },
+  setModel(m) { SND.stopAll(); model = normalize(m); cur = model.floors.length - 1; sel.clear(); hid.clear(); focus = null; openT.clear(); tool = 'select'; calib = null; measures = []; undoStack = []; redoStack = []; SK.prune(model); resetSig(); save(); fit(); renderAll(); if (view === '3d') setView('3d'); },
   setCur(i) { cur = clamp(i, 0, levels(model).length - 1); sel.clear(); save(); renderAll(); },
   replaceFloor(i, items, walls) { commit(); Object.assign(model.floors[i], { items, walls }); liftMenara(model); normalize(model); cur = i; sel.clear(); resetSig(); save(); renderAll(); },
   refresh() { renderTools(); renderPlan(); renderSide(); },
@@ -186,11 +190,20 @@ D.init(app);
 // ---------- katalog, lantai, alat ----------
 function renderCatalog() {
   const tabs = `<div class="cattabs" role="tablist"><button type="button" data-tab="katalog" class="${catTab === 'katalog' ? 'on' : ''}">Katalog</button><button type="button" data-tab="daftar" class="${catTab === 'daftar' ? 'on' : ''}">${icon('list', 14)} Daftar${hid.size || focus ? ' •' : ''}</button></div>`;
-  $('#catalog').innerHTML = tabs + (catTab === 'daftar' ? listHTML() : CATALOG.map(g => `<h4>${g.group}</h4>` + g.items.map(it => {
-    const t = it.kind === 'wall' ? 'sekat' : 'place:' + it.t;
-    return `<button type="button" class="it${tool === t ? ' on' : ''}" data-t="${it.t}" title="${esc(it.tip)}">${symbolSVG(it.t)}<span>${it.t === 'menara' && model?.menara ? 'Buka lantai menara' : it.name}</span></button>`;
-  }).join('')).join(''));
+  $('#catalog').innerHTML = tabs + (catTab === 'daftar' ? listHTML() : CATALOG.map(g => {
+    const cl = catClosed.has(g.group);
+    return `<div class="cgrp${cl ? ' cl' : ''}"><h4 class="cgh" data-cg="${esc(g.group)}">${g.group}<i>${g.items.length}</i></h4><div class="cgi">` + g.items.map(it => {
+      const t = it.kind === 'wall' ? 'sekat' : 'place:' + it.t;
+      return `<button type="button" class="it${tool === t ? ' on' : ''}" data-t="${it.t}" title="${esc(it.tip)}">${symbolSVG(it.t)}<span>${it.t === 'menara' && model?.menara ? 'Buka lantai menara' : it.name}</span></button>`;
+    }).join('') + '</div></div>';
+  }).join(''));
   $('#catalog').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { catTab = b.dataset.tab; renderCatalog(); });
+  $('#catalog').querySelectorAll('.cgh').forEach(h => h.onclick = () => {   // grup katalog bisa dilipat (dropdown)
+    const k = h.dataset.cg;
+    if (catClosed.has(k)) catClosed.delete(k); else catClosed.add(k);
+    try { localStorage.setItem('waletPlanner.catg', JSON.stringify([...catClosed])); } catch {}
+    renderCatalog();
+  });
   if (catTab === 'daftar') return bindList();
   $('#catalog').querySelectorAll('.it').forEach(b => b.onclick = () => {
     const it = TYPES[b.dataset.t], t = it.kind === 'wall' ? 'sekat' : 'place:' + it.t;
@@ -395,6 +408,17 @@ function renderPlan() {
     site: site?.src ? siteDraw() : null,
     mark: mark && (mark.f == null || mark.f === cur) ? mark : null,
   });
+  // tweeter channel yang sedang berbunyi ditandai lingkaran berdenyut (warna channel-nya)
+  if (SND.playing.size) {
+    try {
+      const rings = channels(model).filter(c2 => SND.isPlaying(c2.id) && chCover(c2, cur)).flatMap(c2 =>
+        floor().items.filter(it => it.t === c2.t && showOf(it)).map(it => {
+          const p2 = center(it);
+          return `<circle cx="${round(vp.ox + p2.x * vp.s, 1)}" cy="${round(vp.oy + p2.y * vp.s, 1)}" r="12" fill="none" stroke="${c2.warna}" stroke-width="2.6"/>`;
+        }));
+      if (rings.length) html += `<g class="sndm" pointer-events="none">${rings.join('')}</g>`;
+    } catch {}
+  }
   // alat "Geser / perbesar foto": bingkai + pegangan sudut foto satelit (fotonya yang digeser, bukan gedung)
   if (tool === 'site' && site?.src) {
     const R = siteRect(site), rad = ((site.rot || 0) * Math.PI) / 180, co = Math.cos(rad), si = Math.sin(rad);
@@ -1341,6 +1365,33 @@ $('#btnProject').onclick = () => D.dlgManual(false);
 $('#btnNew').innerHTML = `${icon('plan', 15)} Proyek`; $('#btnNew').onclick = () => D.dlgProjects();
 $('#btnFinish').onclick = () => D.dlgFinish();
 $('#btnAudio').innerHTML = `${icon('audio', 15)} Ruang audio`; $('#btnAudio').onclick = () => D.dlgAudio();
+// rekam layar → simpan .webm di perangkat (3D: langsung dari kanvas; 2D: pilih tab lewat izin browser)
+let rec = null;
+function recBtn() { const b = $('#btnRec'); b.classList.toggle('rec', !!rec); b.innerHTML = rec ? '⏺ Berhenti & simpan' : '⏺ Rekam'; }
+async function toggleRec() {
+  if (rec) { rec.stop(); return; }
+  let stream;
+  try {
+    const cv3 = view === '3d' && $('#view3d canvas');
+    stream = cv3 ? cv3.captureStream(30) : await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+  } catch (e) { console.warn('rekam', e); hint('Rekam layar dibatalkan / tidak didukung browser ini.'); return; }
+  const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+  if (!mime) { stream.getTracks().forEach(t => t.stop()); hint('Browser ini tidak mendukung perekaman video.'); return; }
+  const mr = new MediaRecorder(stream, { mimeType: mime }), chunks = [];
+  mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  mr.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    const url = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' })), el = document.createElement('a');
+    el.href = url; el.download = `rekaman-walet-${new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-')}.webm`;
+    document.body.append(el); el.click(); el.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    rec = null; recBtn(); hint('Rekaman tersimpan (.webm) di folder unduhan.', 6000);
+  };
+  stream.getVideoTracks()[0].onended = () => { if (rec) rec.stop(); };
+  mr.start(250); rec = mr; recBtn();
+  hint(view === '3d' ? 'Merekam tampilan 3D… tekan tombol rekam lagi untuk berhenti & menyimpan.' : 'Merekam… tekan tombol rekam lagi untuk berhenti & menyimpan.', 7000);
+}
+$('#btnRec').onclick = toggleRec; recBtn();
 $('#btnRAB').innerHTML = `${icon('table', 15)} RAB`; $('#btnRAB').onclick = () => D.dlgRAB();
 $('#btnHelp').innerHTML = icon('help', 16); $('#btnHelp').onclick = () => D.dlgHelp();
 D.setupAdmin($('#btnExport'));

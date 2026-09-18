@@ -310,6 +310,23 @@ body.pl-lock .pl #dlg{visibility:visible}
 .pl-dlg .hlp{margin:6px 0 2px;font-size:13.5px;color:#3a4452;line-height:1.6}
 .pl-dlg .bad{color:#C62828}
 .pl-dlg table.pjt td{padding:8px 6px}
+/* grup katalog dropdown */
+.pl-cat .cgh{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}
+.pl-cat .cgh::before{content:"▾";font-size:8px;color:var(--muted);transition:transform .15s}
+.pl-cat .cgrp.cl .cgh::before{transform:rotate(-90deg)}
+.pl-cat .cgh i{font-style:normal;margin-left:auto;color:#b3bac3;font-weight:400}
+.pl-cat .cgrp.cl .cgi{display:none}
+/* tombol rekam layar */
+#btnRec.rec{background:#C62828;border-color:#C62828;color:#fff;animation:recblink 1.2s ease-in-out infinite}
+@keyframes recblink{50%{opacity:.65}}
+/* tanda tweeter yang sedang berbunyi */
+.pl-plan .sndm circle{transform-box:fill-box;transform-origin:center;animation:sndp 1.1s ease-out infinite}
+@keyframes sndp{0%{transform:scale(.55);opacity:1}80%{transform:scale(1.5);opacity:.1}100%{transform:scale(1.55);opacity:0}}
+.pl-dlg .mini.on2{background:#2E7D32;border-color:#2E7D32;color:#fff}
+/* daftar centang lembar PDF */
+.pl-dlg .pdfl{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
+.pl-dlg .pdfl .chk{margin:5px 0}
+@media(max-width:560px){.pl-dlg .pdfl{grid-template-columns:1fr}}
 /* alat geser foto satelit */
 .pl-plan.t-site{cursor:move}
 .pl-plan .siteBox .hs{fill:#fff;stroke:#1565C0;stroke-width:1.6;cursor:nwse-resize}

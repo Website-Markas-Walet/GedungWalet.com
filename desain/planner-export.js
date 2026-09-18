@@ -136,25 +136,31 @@ export async function makeSheetCanvas(m, a, img3d) {
   return cv;
 }
 
-// Bungkus canvas lembar desain menjadi PDF satu halaman (JPEG DCTDecode di dalam PDF — tanpa pustaka luar).
-export function canvasPDF(cv, q = 0.92) {
-  const bin = atob(cv.toDataURL('image/jpeg', q).split(',')[1]);
-  const img = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) img[i] = bin.charCodeAt(i);
-  const W = cv.width, H = cv.height, enc = s => new TextEncoder().encode(s);
+// Bungkus canvas menjadi PDF (JPEG DCTDecode, tanpa pustaka luar). Multi-halaman: satu canvas = satu halaman,
+// ukuran halaman mengikuti ukuran canvas masing-masing.
+export function pagesPDF(cvs, q = 0.9) {
+  const enc = s => new TextEncoder().encode(s);
   const parts = []; let off = 0; const offs = [];
   const push = c => { parts.push(c); off += c.length; };
   const obj = (n, body) => { offs[n] = off; push(enc(`${n} 0 obj\n${body}\nendobj\n`)); };
+  const N = cvs.length;
   push(enc('%PDF-1.4\n'));
   obj(1, '<</Type/Catalog/Pages 2 0 R>>');
-  obj(2, '<</Type/Pages/Kids[3 0 R]/Count 1>>');
-  obj(3, `<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${W} ${H}]/Resources<</XObject<</Im0 4 0 R>>/ProcSet[/PDF/ImageC]>>/Contents 5 0 R>>`);
-  offs[4] = off;
-  push(enc(`4 0 obj\n<</Type/XObject/Subtype/Image/Width ${W}/Height ${H}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${img.length}>>\nstream\n`));
-  push(img); push(enc('\nendstream\nendobj\n'));
-  const ct = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
-  obj(5, `<</Length ${ct.length}>>\nstream\n${ct}\nendstream`);
-  const xref = off;
-  push(enc(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map(n => String(offs[n]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`));
+  obj(2, `<</Type/Pages/Kids[${cvs.map((_, i) => `${3 + i * 3} 0 R`).join(' ')}]/Count ${N}>>`);
+  cvs.forEach((cv, i) => {
+    const P = 3 + i * 3, I = P + 1, C = P + 2, W = cv.width, H = cv.height;
+    const bin = atob(cv.toDataURL('image/jpeg', q).split(',')[1]);
+    const img = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) img[k] = bin.charCodeAt(k);
+    obj(P, `<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${W} ${H}]/Resources<</XObject<</Im${i} ${I} 0 R>>/ProcSet[/PDF/ImageC]>>/Contents ${C} 0 R>>`);
+    offs[I] = off;
+    push(enc(`${I} 0 obj\n<</Type/XObject/Subtype/Image/Width ${W}/Height ${H}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${img.length}>>\nstream\n`));
+    push(img); push(enc('\nendstream\nendobj\n'));
+    const ct = `q ${W} 0 0 ${H} 0 0 cm /Im${i} Do Q`;
+    obj(C, `<</Length ${ct.length}>>\nstream\n${ct}\nendstream`);
+  });
+  const size = 3 + N * 3, xref = off;
+  push(enc(`xref\n0 ${size}\n0000000000 65535 f \n${Array.from({ length: size - 1 }, (_, k) => String(offs[k + 1]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<</Size ${size}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`));
   return new Blob(parts, { type: 'application/pdf' });
 }
+export const canvasPDF = (cv, q = 0.92) => pagesPDF([cv], q);

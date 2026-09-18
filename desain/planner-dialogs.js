@@ -7,6 +7,7 @@ import { luxTxt } from './planner-light.js';
 import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js';
 import { rabRows } from './planner-rab.js';
 import * as SK from './planner-sketch.js';
+import * as SND from './planner-suara.js';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -168,7 +169,7 @@ export function dlgFinish() {
      <div class="thumbs">${levels(m).map((f, i) => `<figure>${floorSVG(m, i, s, { pad: 4, dims: false, labels: false, chain: false, struktur: false, pfx: 'th' + i })}<figcaption>${f.name}</figcaption></figure>`).join('')}</div>`,
     `<button type="button" class="pl-btn" id="dPDF">Unduh PDF</button><button type="button" class="pl-btn" id="dCopy">Salin link desain</button><button type="button" class="pl-btn pl-primary" id="dWA">${icon('wa', 16)} Kirim ke WhatsApp</button>`);
   $('#dCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); $('#dCopy').textContent = 'Tersalin ✓'; } catch { prompt('Salin link ini:', link); } };
-  $('#dPDF').onclick = () => downloadPDF($('#dPDF'));
+  $('#dPDF').onclick = () => dlgPDF();
   $('#dWA').onclick = () => {
     m.owner = $('#fOwner').value.trim(); m.city = $('#fCity2').value.trim(); A.save();
     const note = $('#fNote').value.trim();
@@ -191,6 +192,37 @@ export function dlgFinish() {
     ];
     window.open(`https://api.whatsapp.com/send?phone=${WA_NUMBER}&text=${encodeURIComponent(lines.join('\n'))}`, '_blank', 'noopener');
     try { window.dataLayer?.push({ event: 'planner_finish', size: `${m.w}x${m.h}`, floors: m.floors.length, score: a.score, mode: m.survey ? 'pengamatan' : 'manual' }); } catch {}
+  };
+}
+
+// ---------- ekspor PDF multi-lembar (centang lembar yang diikutkan) ----------
+export async function dlgPDF() {
+  const { LEMBAR } = await import('./planner-pdf.js');
+  openDlg('Ekspor PDF — pilih lembar',
+    `<p class="lead">Setiap lembar berisi gambaran semua lantai untuk satu tema, lengkap dengan penjelasan & legenda. Centang yang mau diikutkan ke PDF.</p>
+     <div class="pdfl">${LEMBAR.map(([k, nm]) => `<label class="chk"><input type="checkbox" data-pk="${k}" checked> ${nm}</label>`).join('')}</div>
+     <div class="acts"><button type="button" class="mini" id="pdAll">Centang semua</button><button type="button" class="mini" id="pdNone">Kosongkan</button></div>
+     <p class="tip">Lembar pencahayaan, dB, dan kenyamanan memakai pengaturan simulasi saat ini (jam, arah hadap, langit). Foto satelit & sketsa tangan tidak ikut ke PDF.</p>`,
+    `<button type="button" class="pl-btn" id="pdBatal">Batal</button><button type="button" class="pl-btn pl-blue" id="pdGo">Buat PDF</button>`, 'mid');
+  $('#pdBatal').onclick = () => dlg.close();
+  $('#pdAll').onclick = () => dlg.querySelectorAll('[data-pk]').forEach(i => { i.checked = true; });
+  $('#pdNone').onclick = () => dlg.querySelectorAll('[data-pk]').forEach(i => { i.checked = false; });
+  $('#pdGo').onclick = async () => {
+    const keys = [...dlg.querySelectorAll('[data-pk]')].filter(i => i.checked).map(i => i.dataset.pk);
+    if (!keys.length) { A.hint('Centang minimal satu lembar.'); return; }
+    const btn = $('#pdGo'); btn.disabled = true; $('#pdBatal').disabled = true;
+    try {
+      const m = A.model;
+      const img3d = keys.includes('lengkap') ? (await A.load3D()).snapshotSheet(m, 1280, 960) : null;
+      const { buildPDF } = await import('./planner-pdf.js');
+      const blob = await buildPDF(m, keys, img3d, t => { btn.textContent = t; });
+      const url = URL.createObjectURL(blob), el = document.createElement('a');
+      el.href = url; el.download = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${keys.length}lembar.pdf`;
+      document.body.append(el); el.click(); el.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      btn.textContent = `PDF ${keys.length} lembar terunduh ✓`;
+      setTimeout(() => dlg.close(), 1500);
+    } catch (e) { console.error('PDF', e); btn.textContent = 'Gagal — coba lagi'; btn.disabled = false; $('#pdBatal').disabled = false; }
   };
 }
 
@@ -603,7 +635,7 @@ const audioOf = m => ({ items: (m.audio?.items || AUDIO_DEFAULT.items).map(x => 
 export function dlgAudio() {
   const m = A.model, au = audioOf(m);
   // channel bekerja pada salinan; disimpan ke m.kabel.ch saat "Simpan"
-  let ch = channels(m).map(c => ({ t: c.t, f: c.f, n: c.n, nm: c.nm, vol: c.vol, fd: c.fd || '', ket: c.ket || '', on: c.on !== false }));
+  let ch = channels(m).map(c => ({ id: c.id, t: c.t, f: c.f, n: c.n, nm: c.nm, vol: c.vol, fd: c.fd || '', ket: c.ket || '', on: c.on !== false }));
   const su = SUARA[m.survey?.env || 'sawah'], tg = dbTarget(m.survey?.env || 'sawah');
   // pilihan lantai: semua, per lantai, gabungan 2 lantai (gedung kecil: 2 lantai cukup 1 channel), menara
   const fKey = v => (Array.isArray(v) ? v.join(':') : String(v));
@@ -630,6 +662,8 @@ export function dlgAudio() {
         <td class="mut">${lenOf(c) != null ? `${fmt(Math.round(lenOf(c)))} m` : '—'}</td>
         <td><input data-c="fd" value="${esc(c.fd)}" placeholder="Flashdisk / file suara" style="width:120px"></td>
         <td><input data-c="ket" value="${esc(c.ket)}" placeholder="mis. ${esc(c.t === 'hexa' ? su.panggil : c.t === 'twtarik' ? su.tarik : su.inap)}" style="width:150px"></td>
+        <td class="mut" style="white-space:nowrap"><label class="mini" title="Unggah file suara walet (mp3/wav) — tersimpan di perangkat ini"><input type="file" data-snd="${k}" accept="audio/*" hidden>🎵</label>
+          <button type="button" class="mini${SND.isPlaying(c.id) ? ' on2' : ''}" data-play="${k}" title="Putar / hentikan — tweeter channel ini ditandai berdenyut di denah">${SND.isPlaying(c.id) ? '⏹' : '▶'}</button></td>
         <td><button type="button" class="mini" data-del="${k}">✕</button></td></tr>`;
     }).join('');
     const alatRows = au.items.map((it, k) => `<tr data-a="${k}">
@@ -641,7 +675,7 @@ export function dlgAudio() {
     const rak = au.items.filter(i => i.n > 0).map(i => `<span class="rk${AMPLI_KEYS.has(i.t) ? ' amp' : ''}">${(NAMA_ALL[i.t] || i.t)}${i.n > 1 ? ` ×${i.n}` : ''}</span>`).join('');
     openDlg('Ruang audio — channel, ampli & jadwal',
       `<p class="lead">Semua kabel tweeter berujung di ruang audio. Atur channel (bebas: 1 lantai inap = 1 channel, atau dibagi 3 channel untuk gedung besar), volume dB tiap channel, flashdisk & suara Markaswalet yang dipakai, perangkat di rak, dan jadwal timer.</p>
-       <div class="aud-scroll"><table class="audt"><tr><th title="Saklar cek tweeter">Cek</th><th>Nama channel</th><th>Jenis tweeter</th><th>Lantai</th><th>Bagi</th><th>Volume</th><th>Ch ampli</th><th>Kabel</th><th>Flashdisk</th><th>Suara (Markaswalet)</th><th></th></tr>${chRows}</table></div>
+       <div class="aud-scroll"><table class="audt"><tr><th title="Saklar cek tweeter">Cek</th><th>Nama channel</th><th>Jenis tweeter</th><th>Lantai</th><th>Bagi</th><th>Volume</th><th>Ch ampli</th><th>Kabel</th><th>Flashdisk</th><th>Suara (Markaswalet)</th><th>Putar</th><th></th></tr>${chRows}</table></div>
        <div class="acts"><button type="button" class="mini" id="auAdd">+ Tambah channel</button><button type="button" class="mini" id="auAuto">Susun otomatis per lantai</button>
         <span class="tip" style="margin:0 0 0 auto">${terpakai} channel terpakai / kapasitas ampli ${kapasitas}${terpakai > kapasitas ? ' — <b class="bad">kurang ampli!</b>' : ' ✓'}</span></div>
        <p class="tip">Volume channel = keluaran dB tiap tweeter pada 1 m (target buku: panggil ${tg.panggil[0]}–${tg.panggil[1]}, tarik ${tg.tarik[0]}–${tg.tarik[1]}, inap ${tg.inap[0]}–${tg.inap[1]} dB). Hasil sebarannya per ruang dilihat di mode <b>Cek dB</b>. Saklar "Cek" mematikan channel untuk mengecek tweeter mana yang hidup.</p>
@@ -660,8 +694,21 @@ export function dlgAudio() {
       else if (p === 'nm' || p === 'fd' || p === 'ket') c[p] = inp.value.slice(0, 160);
       else if (p === 't') c.t = inp.value;
       else if (p === 'f') c.f = inp.value.includes(':') ? inp.value.split(':').map(Number) : +inp.value;
-      else c[p] = clamp(Math.round(+inp.value || 0), p === 'n' ? 1 : 40, p === 'n' ? 6 : 110);
+      else { c[p] = clamp(Math.round(+inp.value || 0), p === 'n' ? 1 : 40, p === 'n' ? 6 : 110); if (p === 'vol') SND.setVol(c.id, c.vol); }
       rd();
+    });
+    dlg.querySelectorAll('[data-snd]').forEach(inp => inp.onchange = async () => {
+      const c = ch[+inp.dataset.snd], f = inp.files[0]; if (!f) return;
+      await SND.setSuara(m, c.id, f);
+      c.fd = f.name.slice(0, 60); rd();
+      A.hint(`File suara "${f.name}" tersimpan untuk channel ${c.nm} — tekan ▶ untuk memutar.`, 6000);
+    });
+    dlg.querySelectorAll('[data-play]').forEach(b => b.onclick = async () => {
+      const c = ch[+b.dataset.play], r2 = await SND.toggle(m, c);
+      if (r2 === 'kosong') A.hint('Belum ada file suara — unggah dulu lewat ikon 🎵 di baris channel ini.', 5000);
+      else if (r2 === 'gagal') A.hint('File suara tidak bisa diputar browser ini (coba MP3/WAV).', 5000);
+      else if (r2 === 'main') A.hint('Suara diputar berulang — tweeter channel ini ditandai berdenyut di denah 2D. Tekan ⏹ untuk berhenti.', 7000);
+      rd(); A.refresh();
     });
     dlg.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { ch.splice(+b.dataset.del, 1); rd(); });
     $('#auAdd').onclick = () => { ch.push({ t: 'twinap', f: -1, n: 1, nm: `Channel ${ch.length + 1}`, vol: 60, fd: '', ket: '', on: true }); rd(); };
@@ -683,7 +730,7 @@ export function dlgAudio() {
     $('#auBatal').onclick = () => dlg.close();
     $('#auOk').onclick = () => {
       A.commit();
-      m.kabel = { ch: ch.map(c => ({ ...c })) };
+      m.kabel = { ch: ch.map(c => ({ ...c })) };   // id ikut disimpan agar file suara per channel tetap terpaut
       m.audio = { items: au.items.filter(i => i.n > 0), jadwal: au.jadwal };
       dlg.close(); A.save(); A.renderAll(); A.hint('Pengaturan ruang audio & channel disimpan — lihat mode "Kabel" dan "Cek dB".', 6000);
     };
@@ -785,7 +832,8 @@ async function exportSheet() {
     const nm0 = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${m.w}x${m.h}-${m.floors.length}lt`;
     openDlg('Lembar desain',
       `<p class="lead">Kirim gambar ini ke WhatsApp pelanggan${m.owner ? ` (${esc(m.owner)})` : ''}. Pilih "Salin gambar" lalu tempel (Ctrl+V) di WhatsApp Web, atau unduh PNG / PDF.</p><img class="sheet" src="${url}" alt="Lembar desain rumah walet">`,
-      `<button type="button" class="pl-btn" id="dCopyImg">Salin gambar</button><a class="pl-btn" href="${urlPdf}" download="${esc(nm0)}.pdf">Unduh PDF</a><a class="pl-btn pl-primary" href="${url}" download="${esc(nm0)}.png">Unduh PNG</a>`, true);
+      `<button type="button" class="pl-btn" id="dPdfMulti">PDF multi-lembar…</button><button type="button" class="pl-btn" id="dCopyImg">Salin gambar</button><a class="pl-btn" href="${urlPdf}" download="${esc(nm0)}.pdf">Unduh PDF</a><a class="pl-btn pl-primary" href="${url}" download="${esc(nm0)}.png">Unduh PNG</a>`, true);
+    $('#dPdfMulti').onclick = () => dlgPDF();
     $('#dCopyImg').onclick = async () => {
       try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); $('#dCopyImg').textContent = 'Tersalin ✓'; }
       catch { A.hint('Browser tidak mengizinkan salin gambar — gunakan Unduh PNG.'); }
