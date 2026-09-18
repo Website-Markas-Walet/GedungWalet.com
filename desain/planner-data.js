@@ -83,9 +83,10 @@ export const dbMid = r => Math.round((r[0] + r[1]) / 2);
 // Perangkat ruang audio (tab "Ruang audio"): ampli + alat pendukung. ch = jumlah channel bawaan ampli.
 export const AMPLI = [['axm', 'Ampli AXM Garuda', 4], ['piro88', 'Ampli Piro 88', 8], ['piro89', 'Ampli Piro 89', 8]];
 export const AUDIO_ALAT = [
-  ['kipas', 'Kipas pendingin ampli'], ['timerKitani', 'Timer Kitani (kipas)'], ['timerAC', 'Timer AC (jadwal suara)'],
-  ['saklar', 'Saklar cek tweeter'], ['stopkontak', 'Stop kontak'], ['aki', 'Aki (cadangan listrik)'],
+  ['kipas', 'Kipas DC pendingin ampli'], ['timerKitani', 'Timer Kitani (kipas)'], ['timerAC', 'Timer AC (jadwal suara)'],
+  ['saklar', 'Saklar cek tweeter'], ['stopkontak', 'Stop kontak'], ['aki', 'Aki mobil (cadangan listrik)'],
   ['flashdisk', 'Flashdisk suara'], ['twKontrolT', 'Tweeter kontrol tarik (di dinding)'], ['twKontrolI', 'Tweeter kontrol inap (di dinding)'],
+  ['lampu', 'Lampu ruang audio'],
 ];
 export const AUDIO_DEFAULT = { items: [{ t: 'axm', n: 1, ch: 4 }, { t: 'kipas', n: 1 }, { t: 'timerKitani', n: 1 }, { t: 'timerAC', n: 1 }, { t: 'saklar', n: 1 }, { t: 'stopkontak', n: 2 }, { t: 'aki', n: 1 }],
   jadwal: { panggil: [5, 19], tarik: [0, 24], inap: [0, 24] } };   // panggil hanya 05.00–19.00 (etika lingkungan, buku)
@@ -134,11 +135,11 @@ export const CATALOG = [
       tip: 'Paralon 4" bulat menembus dinding tiap ±1 m, 60 cm di bawah sirip; di dalam memakai elbow menghadap ke bawah lalu pipa turun 1 m (+ jaring hama). Tidak perlu di area void; kurangi di daerah lembab; jangan menghadap laut.' },
   ]},
   { group: 'Suara & iklim', items: [
-    { t: 'twinap', name: 'Tweeter inap', kind: 'obj', w: TW, h: TW, color: '#534AB7', fill: 'rgba(83,74,183,.35)',
+    { t: 'twinap', name: 'Tweeter inap (Audax AX-65)', kind: 'obj', w: TW, h: TW, color: '#534AB7', fill: 'rgba(83,74,183,.35)',
       tip: 'Dipasang di papan sirip ruang inap, semuanya menghadap jalan masuk ruangnya yang mengarah ke LAR void (LAR, atau sekat gantung bila burung masuk lewat bawahnya) — lurus depan/belakang/kiri/kanan saja. Pola per baris 2-1-2 (lebar 1,5 m), 3-2-3 (2–3 m), 4-3-4 (4–5 m).' },
-    { t: 'twtarik', name: 'Tweeter tarik', kind: 'obj', w: TW, h: TW, color: '#C62828', fill: 'rgba(198,40,40,.30)',
+    { t: 'twtarik', name: 'Tweeter tarik (Audax AX-65)', kind: 'obj', w: TW, h: TW, color: '#C62828', fill: 'rgba(198,40,40,.30)',
       tip: 'Di pojok ruang, kusen LAR, dan bibir void. Selalu menghadap tweeter tarik di depannya: inap → LAR inap → jalur → LAR void → LMB; rantai tidak boleh menembus sekat (lewat LAR). Tarik garis dari ujung corongnya ke tweeter di depannya untuk mengatur manual. Jarak maks 5 m.' },
-    { t: 'hexa', name: 'Tweeter hexagonal (panggil)', kind: 'obj', w: 0.44, h: 0.44, color: '#6A1B9A', fill: 'rgba(106,27,154,.22)',
+    { t: 'hexa', name: 'Tweeter hexagonal Audax (panggil)', kind: 'obj', w: 0.44, h: 0.44, color: '#6A1B9A', fill: 'rgba(106,27,154,.22)',
       tip: '6 tweeter panggil tersusun segi enam, dipasang mepet di atas LMB (di menara atau lantai ber-LMB) untuk memanggil walet dari luar. Letakkan dekat LMB: otomatis menempel.' },
     { t: 'kolam', name: 'Kolam air', kind: 'obj', w: 1, h: 2, color: '#378ADD', fill: 'rgba(55,138,221,.35)',
       tip: 'Di lantai dasar, tengah atau sudut ruangan, ventilasi tepat di atasnya. Target kelembapan 75–85% (batas 70–90%).' },

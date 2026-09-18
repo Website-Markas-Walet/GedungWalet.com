@@ -33,7 +33,7 @@ const roleName = r => (TARIK_ROLES.find(([k]) => k === r) || [, 'Tarik'])[1];
 let model = null, cur = 0, tool = 'select', view = '2d', three = null, drag = null, der = null, calib = null, lastA = null;
 let sel = new Set();                                   // id objek & sekat terpilih (boleh banyak)
 let undoStack = [], redoStack = [];
-let spaceDown = false, measures = [], luxOn = false, luxRes = null, airOn = false, dbOn = false, kabelOn = false, mark = null;
+let spaceDown = false, measures = [], luxOn = false, luxRes = null, airOn = false, dbOn = false, kabelOn = false, mark = null, pendRute = null;
 let catTab = 'katalog', hid = new Set(), focus = null, openT = new Set();   // daftar item: disembunyikan / fokus (tidak ikut desain)
 // kartu panel kanan yang dilipat (judul sebelum "—"); tersimpan per perangkat agar panel tidak menumpuk
 let closedCards = new Set(['Sketsa tangan', 'Papan sirip', 'Ukuran gedung', 'Penggaris', 'Ruang dari sekat', 'Lokasi (satelit)']);
@@ -388,7 +388,13 @@ function dbLabels() {
 }
 function cableRuns() {
   let cb; try { cb = cableInfo(model); } catch { return null; }
-  return { runs: cb.chs.flatMap(c => c.runs.filter(r => r.f === cur).map(r => ({ warna: c.warna, pts: r.pts, on: c.on }))), riser: cb.riser };
+  const runs = cb.chs.flatMap(c => c.runs.filter(r => r.f === cur).map(r => ({ warna: c.warna, pts: r.pts, on: c.on })));
+  // sambungan riser → ruang audio (semua kabel dari RBW berujung & tersambung ke ruang audio)
+  if (cb.au && cb.au.li === cur) {
+    const ac = center(cb.au.it);
+    runs.push({ warna: '#455A64', pts: [[cb.riser.x, cb.riser.y], [ac.x, cb.riser.y], [ac.x, ac.y]], on: true });
+  }
+  return { runs, riser: cb.riser };
 }
 function renderPlan() {
   const r = svg.getBoundingClientRect(); if (!r.width || !model) return;
@@ -418,6 +424,12 @@ function renderPlan() {
         }));
       if (rings.length) html += `<g class="sndm" pointer-events="none">${rings.join('')}</g>`;
     } catch {}
+  }
+  // pratinjau jalur kabel manual yang sedang digambar
+  if (tool === 'rute' && pendRute) {
+    const warna = channels(model).find(c2 => c2.id === pendRute.id)?.warna || '#00897B';
+    const P2 = pendRute.pts.map(([px2, py2]) => `${round(vp.ox + px2 * vp.s, 1)},${round(vp.oy + py2 * vp.s, 1)}`);
+    html += `<g pointer-events="none">${P2.length > 1 ? `<polyline points="${P2.join(' ')}" fill="none" stroke="${warna}" stroke-width="2.6" stroke-dasharray="7 5" stroke-linejoin="round"/>` : ''}${P2.map(pt2 => `<circle cx="${pt2.split(',')[0]}" cy="${pt2.split(',')[1]}" r="4" fill="#fff" stroke="${warna}" stroke-width="2"/>`).join('')}</g>`;
   }
   // alat "Geser / perbesar foto": bingkai + pegangan sudut foto satelit (fotonya yang digeser, bukan gedung)
   if (tool === 'site' && site?.src) {
@@ -501,7 +513,7 @@ function placeAt(t, p, keep) {
   if (!inRect(p, F)) hint(`Di luar batas ${floor().name} — elemen diletakkan di tepi lantai.`);
   const it = { id: uid(), t, x: snap(clamp(p.x - T.w / 2, F.x, F.x + F.w - T.w)), y: snap(clamp(p.y - T.h / 2, F.y, F.y + F.h - T.h)), w: T.w, h: T.h };
   if (t === 'inap') it.gap = RULES.siripJarak;
-  if (t === 'lmb') it.tcm = 50;
+  if (t === 'lmb') { it.tcm = 50; it.lmbTw = { a: 2, s: 4, b: 0 }; }   // DED: 2 tarik bibir atas + 4 inap sisi
   if (t === 'sarang') it.ns = 'jadi';
   if (OPENINGS.has(t) && !snapToWall(it, model, floor()) && isLar(t)) hint('LAR belum menempel di sekat — seret ke garis sekat agar sekat terpotong.');
   if (t === 'hexa' && !snapHexa(it, model, floor())) hint('Belum ada LMB di dekatnya — tweeter hexagonal sebaiknya mepet di atas LMB.', 6000);
@@ -553,6 +565,7 @@ function showTip(e, ms) {
 }
 
 svg.addEventListener('contextmenu', e => e.preventDefault());
+svg.addEventListener('dblclick', () => { if (tool === 'rute') finishRute(); });
 svg.addEventListener('pointerleave', hideTip);
 svg.addEventListener('pointerdown', e => {
   if (mark) { mark = null; renderPlan(); }
@@ -561,6 +574,14 @@ svg.addEventListener('pointerdown', e => {
   if (tool === 'calib') return calibClick(p);
   if (tool === 'ukur') { const a = magnet(p, true); drag = { mode: 'ukur', x1: a.x, y1: a.y, x2: a.x, y2: a.y }; capture(e); return; }
   if (tool === 'sekat') { const a = magnet(p); drag = { mode: 'wall', x1: a.x, y1: a.y, x2: a.x, y2: a.y }; capture(e); return; }
+  if (tool === 'rute') {   // gambar jalur kabel manual: klik titik-titik (otomatis siku), Enter/dobel-klik selesai
+    if (!pendRute) { setTool('select'); return; }
+    let q = { x: snap(p.x), y: snap(p.y) };
+    const last = pendRute.pts[pendRute.pts.length - 1];
+    if (last && !e.shiftKey) { if (Math.abs(q.x - last[0]) > Math.abs(q.y - last[1])) q.y = last[1]; else q.x = last[0]; }
+    pendRute.pts.push([round(q.x), round(q.y)]);
+    renderPlan(); return;
+  }
   if (tool === 'site') {   // geser / perbesar foto satelit (bukan gedungnya)
     const sk2 = SK.getSketch(model, 100);
     if (!sk2?.src) { setTool('select'); return; }
@@ -689,7 +710,9 @@ document.addEventListener('keydown', e => {
   else if (mod && k === 'd') { e.preventDefault(); dupSel(); }
   else if (mod && k === 'a') { e.preventDefault(); selectAll(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') deleteSel();
+  else if (e.key === 'Enter' && tool === 'rute') { e.preventDefault(); finishRute(); }
   else if (e.key === 'Escape') {
+    if (tool === 'rute' && pendRute) { pendRute = null; setTool('select'); hint('Gambar jalur kabel dibatalkan.'); return; }
     if (tool === 'ukur' && measures.some(q => q.f === cur)) { measures = measures.filter(q => q.f !== cur); renderPlan(); renderSide(); return; }
     drag = null; sel.clear(); setTool('select');
   }
@@ -838,8 +861,10 @@ function itemPanel(it) {
   if (it.t === 'lmb') {
     const F = FR(), c = center(it), e = [[c.y - F.y, 0, -1], [F.y + F.h - c.y, 0, 1], [c.x - F.x, -1, 0], [F.x + F.w - c.x, 1, 0]].reduce((p, q) => (q[0] < p[0] ? q : p));
     const az = e[0] <= 0.4 ? facadeAz(e[1], e[2], simOf(model).hadap) : null;   // (e[1], e[2]) = arah keluar dinding
+    const q = it.lmbTw || { a: 2, s: 4, b: 0 };
     rows.push(rowNum('Tinggi LMB (cm)', 'tcm', it.tcm || 50, 5, 20), rowInfo('Status', on ? `<span class="ok">Memotong dinding${isMn() ? ' menara' : ''} ✓</span>` : '<span class="bad">Belum menempel di dinding luar</span>'),
-      ...(az != null ? [rowInfo('Menghadap', `${arahNama(az)} (${Math.round(az)}°)`)] : []));
+      ...(az != null ? [rowInfo('Menghadap', `${arahNama(az)} (${Math.round(az)}°)`)] : []),
+      rowInfo('Tweeter di LMB', `${q.a} tarik atas · ${q.s} inap sisi · ${q.b} bawah`));
   }
   if (it.t === 'hexa') {
     const d0 = Math.min(Infinity, ...floor().items.filter(z => z.t === 'lmb').map(z => dist(center(z), center(it))));
@@ -863,6 +888,7 @@ function itemPanel(it) {
       ...(der.blocked.has(it.id) ? [rowInfo('Status', '<span class="bad">Menabrak sekat ✕ — tidak bisa lanjut</span>')] : []));
   }
   const extra = it.t === 'audio' ? `<button type="button" id="aAudio">${icon('audio', 14)} Buka Ruang audio</button>`
+    : it.t === 'lmb' ? `<button type="button" id="aLmb">${icon('list', 14)} Tweeter LMB (tampak depan)…</button>`
     : it.t === 'inap' ? `<button type="button" id="aFill">${icon('spark', 14)} Isi tweeter sesuai pola</button>`
     : OPENINGS.has(it.t) && !on && it.t !== 'lmb' ? `<button type="button" id="aSnap">Tempel ke ${isLar(it.t) ? 'sekat' : 'dinding'}</button>`
     : it.t === 'hexa' ? '<button type="button" id="aHexa">Tempel ke LMB</button>' : '';
@@ -902,6 +928,7 @@ function bindItemPanel(it) {
   const on = (id, fn) => { const b = $('#' + id); if (b) b.onclick = fn; };
   on('aTurn', turnSel); on('aDup', dupSel); on('aDel', deleteSel); on('aLock', toggleLock);
   on('aAudio', () => D.dlgAudio());
+  on('aLmb', () => D.dlgLMB(it));
   on('aSnap', () => { commit(); if (!snapToWall(it, model, floor())) hint('Tidak ada sekat/dinding dalam jarak 0,6 m — geser lebih dekat.'); renderAll(); });
   on('aFill', () => { commit(); fillTwinap(it); resetSig(); renderAll(); });
   on('aHexa', () => { commit(); if (!snapHexa(it, model, floor())) hint('Tidak ada LMB dalam jarak 3 m di lantai ini.'); renderAll(); });
@@ -1084,13 +1111,46 @@ function dbCard() {
 // Kabel tiap channel + klem (mode "Kabel").
 function kabelCard() {
   let cb; try { cb = cableInfo(model); } catch (e) { console.error('kabel', e); return ''; }
-  const rows = cb.chs.map(c => `<tr><td><span class="lxdot" style="background:${c.warna}"></span>${esc(c.nm)}${c.on === false ? ' <small>(cek: mati)</small>' : ''}${c.tembus ? '<br><small class="bad">terkurung sekat bata!</small>' : ''}</td><td>${c.count}</td><td>${fmt(Math.round(c.len))} m</td><td>${fmt(c.klem)}</td></tr>`).join('');
+  const rows = cb.chs.map(c => {
+    const manual = !!model.kabel?.rute?.[c.id]?.[cur], bisa = c.t !== 'hexa' && chCover(c, cur);
+    return `<tr><td><span class="lxdot" style="background:${c.warna}"></span>${esc(c.nm)}${c.on === false ? ' <small>(cek: mati)</small>' : ''}${c.tembus ? '<br><small class="bad">menembus/terkurung bata!</small>' : ''}
+      ${bisa ? `<br><button type="button" class="mini" data-rt="${c.id}">✏️ ${manual ? 'Gambar ulang' : 'Jalur manual'} Lt ini</button>${manual ? ` <button type="button" class="mini" data-rtdel="${c.id}" title="Hapus jalur manual lantai ini — kembali otomatis">🗑</button>` : ''}` : ''}</td>
+      <td>${c.count}</td><td>${fmt(Math.round(c.len))} m${manual ? ' <small>✏️</small>' : ''}</td><td>${fmt(c.klem)}</td></tr>`;
+  }).join('');
   return `<div class="card"><h4>${icon('cable', 14)} Kabel tweeter → ruang audio</h4>
     ${rowInfo('Ruang audio', cb.au ? (cb.luar ? 'di luar gedung ✓' : levels(model)[cb.au.li].name) : '<span class="bad">belum ada</span> — dihitung dari pojok gedung')}
     <table class="luxt t4"><tr class="fl"><td>Channel</td><td>Tw</td><td>Kabel</td><td>Klem</td></tr>${rows}</table>
     ${rowInfo('Total kabel', `<b>${fmt(Math.round(cb.total))} m</b>`)}${rowInfo('Total klem (tiap 10 cm)', `<b>${fmt(cb.klem)}</b>`)}
     <div class="acts"><button type="button" id="kbAudio">${icon('audio', 14)} Atur channel</button></div>
-    <p class="tip">Jalur selalu siku mengikuti alur sirip / dinding (tidak diagonal-melintang), boleh menembus sekat terpal, tidak menembus bata; R = titik naik-turun antar lantai. Kabel hexagonal otomatis dihitung naik setinggi gedung + menara sampai atap. Belum termasuk cadangan ±10%.</p></div>`;
+    <p class="tip">Jalur otomatis selalu siku mengikuti alur sirip / dinding; boleh menembus terpal, tidak menembus bata; R = titik naik-turun antar lantai, lalu tersambung ke ruang audio (garis abu-abu). Tombol ✏️ = gambar jalur kabel SENDIRI untuk lantai aktif (klik titik-titik, Enter selesai) — panjang & klem mengikuti jalur gambar Anda + sambungan tiap tweeter. Kabel hexagonal otomatis naik setinggi gedung + menara. Belum termasuk cadangan ±10%.</p></div>`;
+}
+// gambar / hapus jalur kabel manual channel untuk lantai aktif
+function startRute(id) {
+  const c = channels(model).find(x => x.id === id);
+  if (!c || !chCover(c, cur)) { hint('Channel ini tidak mencakup lantai aktif.'); return; }
+  pendRute = { id, pts: [] };
+  setTool('rute');
+  hint(`Gambar jalur kabel "${c.nm}" di ${floor().name}: klik titik demi titik (otomatis siku; Shift = bebas) — Enter / klik dobel = selesai · Esc = batal.`, 10000);
+}
+function finishRute() {
+  if (!pendRute) { setTool('select'); return; }
+  const { id, pts } = pendRute;
+  pendRute = null;
+  if (pts.length < 2) { setTool('select'); renderPlan(); hint('Jalur batal — butuh minimal 2 titik.'); return; }
+  commit();
+  if (!model.kabel?.ch?.length) model.kabel = { ...(model.kabel || {}), ch: channels(model).map(({ warna, ...c }) => ({ ...c })) };   // bekukan id channel
+  model.kabel.rute = model.kabel.rute || {};
+  (model.kabel.rute[id] = model.kabel.rute[id] || {})[cur] = pts;
+  setTool('select'); save(); renderAll();
+  hint('Jalur kabel manual tersimpan — panjang & klem dihitung dari jalur ini (ikut link desain).', 7000);
+}
+function delRute(id) {
+  const r = model.kabel?.rute; if (!r?.[id]?.[cur]) return;
+  commit();
+  delete r[id][cur];
+  if (!Object.keys(r[id]).length) delete r[id];
+  if (!Object.keys(r).length) delete model.kabel.rute;
+  save(); renderAll(); hint('Jalur manual dihapus — kembali ke rute otomatis.');
 }
 // Foto satelit lokasi (Google Maps) sebagai latar denah.
 const stFile = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*', hidden: true });
@@ -1220,6 +1280,8 @@ function projectPanel() {
   const u = $('#uClr'); if (u) u.onclick = () => { measures = measures.filter(q => q.f !== cur); renderPlan(); renderSide(); };
   bindFloorPanel(); bindSketchCard(); bindLuxCard(); bindSimCard(); bindAirCard(); bindSiteCard();
   ['dbAudio', 'kbAudio'].forEach(id => { const b = $('#' + id); if (b) b.onclick = () => D.dlgAudio(); });
+  $('#props').querySelectorAll('[data-rt]').forEach(b => b.onclick = () => startRute(b.dataset.rt));
+  $('#props').querySelectorAll('[data-rtdel]').forEach(b => b.onclick = () => delRute(b.dataset.rtdel));
   $('#props').querySelectorAll('tr.fl[data-f]').forEach(tr => { if (!tr.onclick) tr.onclick = () => goLevel(+tr.dataset.f); });
   $('#props').querySelectorAll('[data-inap]').forEach(b => b.onclick = () => makeInap(+b.dataset.inap));
 }

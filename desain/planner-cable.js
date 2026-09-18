@@ -89,7 +89,7 @@ function snake(tws) {
 let cache = { sig: '', res: null };
 // Hitung semua kabel: per channel {len (m), klem, runs per lantai (polyline), jumlah tweeter}; total & jumlah klem.
 export function cableInfo(m) {
-  const sig = JSON.stringify([m.w, m.h, m.floorH, m.floors, m.menara || null, m.kabel || null]);
+  const sig = JSON.stringify([m.w, m.h, m.floorH, m.floors, m.menara || null, m.kabel || null, m.audio?.layout ? 1 : 0]);
   if (cache.sig === sig) return cache.res;
   const LV = levels(m), hts = LV.map(fl => floorHt(m, fl)), base = []; hts.reduce((a, h) => (base.push(a), a + h), 0);
   const au = audioRoom(m), F0 = floorRect(m, LV[0]);
@@ -98,6 +98,7 @@ export function cableInfo(m) {
   const riser = { x: clamp(ac.x, F0.x + 0.2, F0.x + F0.w - 0.2), y: clamp(ac.y, F0.y + 0.2, F0.y + F0.h - 0.2) };
   const luarRun = Math.abs(ac.x - riser.x) + Math.abs(ac.y - riser.y);          // ruang audio di luar → kabel keluar dinding
   const grids = LV.map(fl => gridOf(m, fl));
+  const rute = m.kabel?.rute || {};
   const chs = channels(m).map(ch => {
     let len = 0, tembus = false, count = 0;
     const runs = [];
@@ -106,7 +107,32 @@ export function cableInfo(m) {
       const tws = fl.items.filter(t => t.t === ch.t);
       if (!tws.length) return;
       count += tws.length;
-      const g = grids[li], rs = { x: clamp(riser.x, g.F.x + 0.2, g.F.x + g.F.w - 0.2), y: clamp(riser.y, g.F.y + 0.2, g.F.y + g.F.h - 0.2) };
+      const g = grids[li];
+      // jalur manual (digambar pengguna): panjang = jalur + sambungan siku tiap tweeter ke jalur + riser
+      const man = ch.t !== 'hexa' ? rute[ch.id]?.[li] : null;
+      if (Array.isArray(man) && man.length >= 2) {
+        let trunk = 0;
+        for (let q = 1; q < man.length; q++) trunk += Math.abs(man[q][0] - man[q - 1][0]) + Math.abs(man[q][1] - man[q - 1][1]);
+        tws.forEach(t => {
+          const c = center(t); let best = null;
+          for (let q = 1; q < man.length; q++) {
+            const [ax, ay] = man[q - 1], [bx, by] = man[q], dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1e-9;
+            const tt = clamp(((c.x - ax) * dx + (c.y - ay) * dy) / L2, 0, 1), qx = ax + dx * tt, qy = ay + dy * tt;
+            const d = Math.abs(c.x - qx) + Math.abs(c.y - qy);
+            if (!best || d < best.d) best = { d, qx, qy };
+          }
+          if (best) { len += best.d; runs.push({ f: li, pts: [[c.x, c.y], [best.qx, c.y], [best.qx, best.qy]], drop: true }); }
+        });
+        len += trunk + base[li] + 1.2;
+        const blkAt = (x, y) => { const i = Math.floor((x - g.F.x) / g.cs), j = Math.floor((y - g.F.y) / g.cs); return i >= 0 && j >= 0 && i < g.nx && j < g.ny && g.blk[j * g.nx + i]; };
+        for (let q = 1; q < man.length && !tembus; q++) {
+          const [ax, ay] = man[q - 1], [bx, by] = man[q], L = Math.hypot(bx - ax, by - ay) || 1e-9;
+          for (let d2 = 0.08; d2 < L; d2 += 0.15) if (blkAt(ax + ((bx - ax) * d2) / L, ay + ((by - ay) * d2) / L)) { tembus = true; break; }
+        }
+        runs.push({ f: li, pts: man.map(p => [p[0], p[1]]), manual: true });
+        return;
+      }
+      const rs = { x: clamp(riser.x, g.F.x + 0.2, g.F.x + g.F.w - 0.2), y: clamp(riser.y, g.F.y + 0.2, g.F.y + g.F.h - 0.2) };
       const ord = snake(tws), per = Math.ceil(ord.length / ch.n);
       for (let k = 0; k < ch.n; k++) {
         const grp = ord.slice(k * per, (k + 1) * per);

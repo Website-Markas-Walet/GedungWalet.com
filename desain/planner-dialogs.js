@@ -8,6 +8,7 @@ import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js';
 import { rabRows } from './planner-rab.js';
 import * as SK from './planner-sketch.js';
 import * as SND from './planner-suara.js';
+import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -328,6 +329,7 @@ export function buildShareLink(m) {
       if (it.role) ex.r = it.role; if (it.o) ex.o = it.o; if (it.mt != null) ex.m = it.mt; if (auto.has(it.id)) ex.a = 1;
       if (it.st === 'kotak') ex.s = 'k'; if (it.locked) ex.k = 1;
       if (it.ns) ex.n = it.ns[0];                                                       // jenis titik sarang (b/l/p/j)
+      if (it.t === 'lmb' && it.lmbTw) ex.q = [it.lmbTw.a, it.lmbTw.s, it.lmbTw.b];      // susunan tweeter LMB (atas/sisi/bawah)
       if (it.lt) ex.l = it.lt[0]; if (it.to && idx.has(it.to)) ex.t = idx.get(it.to);   // fungsi LAR; tweeter tarik tujuan manual (indeks)
       const a = [CODE[it.t], cm(it.x), cm(it.y)], hasEx = Object.keys(ex).length > 0;
       if (hasEx || !(FIXED.has(it.t) && it.w === T.w && it.h === T.h)) a.push(cm(it.w), cm(it.h));
@@ -343,7 +345,9 @@ export function buildShareLink(m) {
   const adaRab = m.rab && (Object.keys(m.rab.h || {}).length || Object.keys(m.rab.k || {}).length || (m.rab.x || []).length);
   const slim = { v: 6, n: m.name, o: m.owner, c: m.city, w: m.w, h: m.h, fh: m.floorH, k: m.kolom, st: m.showStruktur === false ? 0 : 1, s: m.survey || null, f: floors,
     ...(m.menara ? { mn: encF(m.menara) } : {}), ...(m.sim && Object.keys(m.sim).length ? { sm: m.sim } : {}),
-    ...(m.audio ? { au: m.audio } : {}), ...(m.kabel?.ch?.length ? { kb: { ch: m.kabel.ch } } : {}), ...(adaRab ? { rb: m.rab } : {}),
+    ...(m.audio ? { au: m.audio } : {}),
+    ...(m.kabel?.ch?.length || m.kabel?.rute ? { kb: { ...(m.kabel.ch?.length ? { ch: m.kabel.ch } : {}), ...(m.kabel.rute && Object.keys(m.kabel.rute).length ? { r: m.kabel.rute } : {}) } } : {}),
+    ...(adaRab ? { rb: m.rab } : {}),
     ...(tb !== RULES.siripTebalCm || lb !== RULES.siripLebarCm ? { sp: [tb, lb] } : {}) };
   const json = JSON.stringify(slim);
   const enc = window.LZString ? LZString.compressToEncodedURIComponent(json) : encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
@@ -378,6 +382,7 @@ export function parseShare(hash) {
       if (ex.s === 'k' && (t === 'inap' || t === 'jalur')) it.st = 'kotak';
       if (ex.k) it.locked = true;
       if (t === 'sarang') { it.ns = { b: 'baru', l: 'lama', p: 'polesan', j: 'jadi' }[ex.n] || 'jadi'; }
+      if (t === 'lmb' && Array.isArray(ex.q)) it.lmbTw = { a: num(ex.q[0], 0, 8, 2), s: num(ex.q[1], 0, 8, 4), b: num(ex.q[2], 0, 8, 0) };
       if (typeof ex.l === 'string' && (t === 'lar' || t === 'larj')) { const lt = { i: 'inap', j: 'jalur', v: 'void' }[ex.l]; if (lt) it.lt = lt; }
       if (Number.isInteger(ex.t) && t === 'twtarik') it._to = ex.t;
       return it;
@@ -424,9 +429,26 @@ export function parseShare(hash) {
         .map(x => (jenisOk.has(x?.t) ? { t: x.t, n: num(x.n, 0, 20, 1), ...(AMPLI.some(a => a[0] === x.t) ? { ch: num(x.ch, 1, 32, 4) } : {}) } : null)).filter(Boolean);
       const jd = {};
       ['panggil', 'tarik', 'inap'].forEach(k => { const v = s.au.jadwal?.[k]; if (Array.isArray(v)) jd[k] = [num(v[0], 0, 24, 5), num(v[1], 0, 24, 19)]; });
-      model.audio = { ...(items.length ? { items } : {}), ...(Object.keys(jd).length ? { jadwal: jd } : {}) };
+      const layOk = new Set(['twk', 'saklar', 'stopkontak', 'timerKitani', 'timerAC', 'kipas', 'aki', 'lampu', 'flashdisk', 'axm', 'piro88', 'piro89']);
+      const layout = (Array.isArray(s.au.layout) ? s.au.layout : []).slice(0, 60)
+        .map((x, i2) => (layOk.has(x?.t) ? { id: 'ly' + i2, t: x.t, x: num(x.x, 0, 4, 1), y: num(x.y, 0, 3, 1), ...(x.ch ? { ch: String(x.ch).slice(0, 12) } : {}), ...(x.chN ? { chN: num(x.chN, 1, 12, 4) } : {}) } : null)).filter(Boolean);
+      model.audio = { ...(items.length ? { items } : {}), ...(Object.keys(jd).length ? { jadwal: jd } : {}), ...(layout.length ? { layout } : {}) };
     }
-    if (Array.isArray(s.kb?.ch) && s.kb.ch.length) model.kabel = { ch: s.kb.ch.slice(0, 24).map(c => ({
+    if (s.kb?.r && typeof s.kb.r === 'object') {   // jalur kabel manual per channel per lantai
+      const rute = {};
+      Object.entries(s.kb.r).slice(0, 24).forEach(([id2, byF]) => {
+        if (!/^[\w-]{1,16}$/.test(id2) || typeof byF !== 'object') return;
+        const o2 = {};
+        Object.entries(byF).slice(0, 10).forEach(([li, pts]) => {
+          if (!/^\d$/.test(li) || !Array.isArray(pts)) return;
+          const p2 = pts.slice(0, 60).map(p3 => (Array.isArray(p3) ? [num(p3[0], -8, W + 8), num(p3[1], -8, H + 8)] : null)).filter(Boolean);
+          if (p2.length >= 2) o2[li] = p2;
+        });
+        if (Object.keys(o2).length) rute[id2] = o2;
+      });
+      if (Object.keys(rute).length) model.kabel = { ...(model.kabel || {}), rute };
+    }
+    if (Array.isArray(s.kb?.ch) && s.kb.ch.length) model.kabel = { ...(model.kabel || {}), ch: s.kb.ch.slice(0, 24).map(c => ({
       t: ['twinap', 'twtarik', 'hexa'].includes(c?.t) ? c.t : 'twinap',
       f: Array.isArray(c?.f) ? [Math.round(num(c.f[0], 0, 9, 0)), Math.round(num(c.f[1], 0, 9, 0))].sort((a, b) => a - b) : Math.round(num(c?.f, -1, 9, -1)),
       n: Math.round(num(c?.n, 1, 6, 1)),
@@ -635,7 +657,10 @@ const audioOf = m => ({ items: (m.audio?.items || AUDIO_DEFAULT.items).map(x => 
 export function dlgAudio() {
   const m = A.model, au = audioOf(m);
   // channel bekerja pada salinan; disimpan ke m.kabel.ch saat "Simpan"
-  let ch = channels(m).map(c => ({ id: c.id, t: c.t, f: c.f, n: c.n, nm: c.nm, vol: c.vol, fd: c.fd || '', ket: c.ket || '', on: c.on !== false }));
+  let ch = channels(m).map(c => ({ id: c.id, t: c.t, f: c.f, n: c.n, nm: c.nm, vol: c.vol, fd: c.fd || '', ket: c.ket || '', on: c.on !== false, warna: c.warna }));
+  // tata letak dinding ruang audio (tampak depan) — salinan; item bisa ditambah dari katalog, digeser, dihapus
+  let lay = Array.isArray(m.audio?.layout) && m.audio.layout.length ? m.audio.layout.map(x => ({ ...x })) : defaultLayout(au, ch);
+  let laySel = null;
   const su = SUARA[m.survey?.env || 'sawah'], tg = dbTarget(m.survey?.env || 'sawah');
   // pilihan lantai: semua, per lantai, gabungan 2 lantai (gedung kecil: 2 lantai cukup 1 channel), menara
   const fKey = v => (Array.isArray(v) ? v.join(':') : String(v));
@@ -679,6 +704,12 @@ export function dlgAudio() {
        <div class="acts"><button type="button" class="mini" id="auAdd">+ Tambah channel</button><button type="button" class="mini" id="auAuto">Susun otomatis per lantai</button>
         <span class="tip" style="margin:0 0 0 auto">${terpakai} channel terpakai / kapasitas ampli ${kapasitas}${terpakai > kapasitas ? ' — <b class="bad">kurang ampli!</b>' : ' ✓'}</span></div>
        <p class="tip">Volume channel = keluaran dB tiap tweeter pada 1 m (target buku: panggil ${tg.panggil[0]}–${tg.panggil[1]}, tarik ${tg.tarik[0]}–${tg.tarik[1]}, inap ${tg.inap[0]}–${tg.inap[1]} dB). Hasil sebarannya per ruang dilihat di mode <b>Cek dB</b>. Saklar "Cek" mematikan channel untuk mengecek tweeter mana yang hidup.</p>
+       <h3 class="aud-h">Desain ruang audio — tampak depan (2D)</h3>
+       <p class="tip" style="margin-top:0">Isi dinding ruang audio dari katalog di bawah: klik jenis barang untuk menambah, seret untuk memindah, klik untuk memilih (lalu bisa dihapus / diganti channel-nya / dites suaranya). Kenop pada ampli menunjukkan volume tiap channel — mengubah volume di tabel channel otomatis mengubah kenop & suara di RBW.</p>
+       <div class="acts elpal">${[['twk', 'Tweeter tes'], ['saklar', 'Saklar'], ['stopkontak', 'Stop kontak'], ['axm', 'Ampli AXM'], ['piro88', 'Piro 88'], ['piro89', 'Piro 89'], ['timerKitani', 'Timer Kitani'], ['timerAC', 'Timer AC'], ['kipas', 'Kipas DC'], ['aki', 'Aki'], ['lampu', 'Lampu']].map(([t, n2]) => `<button type="button" class="mini" data-eladd="${t}">+ ${n2}</button>`).join('')}
+        <button type="button" class="mini" id="elAuto" style="margin-left:auto">Susun otomatis</button></div>
+       <div class="aud-scroll elwrap" id="auElev">${audioElevSVG(ch, layVol(lay, ch), { s: 168, sel: laySel, interactive: true, label: true, volOf: i2 => ch[i2]?.vol })}</div>
+       ${laySel ? (() => { const it = lay.find(x => x.id === laySel); if (!it) return ''; const cOpt = ch.map(c => `<option value="${c.id}"${it.ch === c.id ? ' selected' : ''}>${esc(c.nm)}</option>`).join(''); return `<div class="acts elsel"><b>${esc({ twk: 'Tweeter tes' }[it.t] || (NAMA_ALL[it.t] || it.t))}</b>${it.t === 'twk' ? `<select id="elCh">${cOpt}</select><button type="button" class="mini" id="elPlay">${SND.isPlaying(it.ch) ? '⏹ Stop' : '▶ Tes suara'}</button>` : ''}${A2K.has(it.t) ? `<label>Channel: <input id="elChN" type="number" min="1" max="12" value="${it.chN || 4}" style="width:52px"></label>` : ''}<button type="button" class="mini" id="elDel">🗑 Hapus</button><span class="tip" style="margin:0">seret untuk memindah</span></div>`; })() : ''}
        <h3 class="aud-h">Perangkat di ruang audio</h3>
        <table class="audt"><tr><th>Perangkat</th><th>Jumlah</th><th>Channel</th><th>Urutan rak</th><th></th></tr>${alatRows}</table>
        <div class="acts"><button type="button" class="mini" id="alAdd">+ Tambah perangkat</button></div>
@@ -723,6 +754,46 @@ export function dlgAudio() {
     dlg.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const k = +b.dataset.up; [au.items[k - 1], au.items[k]] = [au.items[k], au.items[k - 1]]; rd(); });
     dlg.querySelectorAll('[data-dn]').forEach(b => b.onclick = () => { const k = +b.dataset.dn; [au.items[k + 1], au.items[k]] = [au.items[k], au.items[k + 1]]; rd(); });
     $('#alAdd').onclick = () => { au.items.push({ t: 'flashdisk', n: 1 }); rd(); };
+    // --- elevasi ruang audio: tambah dari katalog, seret, pilih, hapus, tes suara ---
+    dlg.querySelectorAll('[data-eladd]').forEach(b => b.onclick = () => {
+      const t = b.dataset.eladd;
+      lay.push({ id: 'ly' + Date.now().toString(36) + lay.length, t, x: WALL_W / 2, y: t === 'aki' ? 2 : A2K.has(t) ? 1.48 : 0.9, ...(t === 'twk' ? { ch: ch[0]?.id } : {}), ...(A2K.has(t) ? { chN: AMPLI.find(a => a[0] === t)?.[2] || 4 } : {}) });
+      laySel = lay[lay.length - 1].id; rd();
+    });
+    $('#elAuto').onclick = () => { lay = defaultLayout(au, ch); laySel = null; rd(); };
+    const elWrap = $('#auElev');
+    if (elWrap) {
+      const toM = e => { const r2 = elWrap.querySelector('svg').getBoundingClientRect(); return { x: (e.clientX - r2.left - 14) / 168, y: (e.clientY - r2.top - 14) / 168 }; };
+      let dragEl = null;
+      elWrap.addEventListener('pointerdown', e => {
+        const g = e.target.closest('.ael');
+        if (!g) { if (laySel) { laySel = null; rd(); } return; }
+        const it = lay.find(x => x.id === g.dataset.lid); if (!it) return;
+        dragEl = { it, p0: toM(e), x0: it.x, y0: it.y, moved: false };
+        elWrap.setPointerCapture?.(e.pointerId);
+        if (laySel !== it.id) { laySel = it.id; }
+        e.preventDefault();
+      });
+      elWrap.addEventListener('pointermove', e => {
+        if (!dragEl) return;
+        const p = toM(e), dx = p.x - dragEl.p0.x, dy = p.y - dragEl.p0.y;
+        if (Math.hypot(dx, dy) > 0.01) dragEl.moved = true;
+        dragEl.it.x = Math.round(clamp(dragEl.x0 + dx, 0.1, WALL_W - 0.1) * 100) / 100;
+        dragEl.it.y = Math.round(clamp(dragEl.y0 + dy, 0.08, WALL_H - 0.08) * 100) / 100;
+        elWrap.innerHTML = audioElevSVG(ch, layVol(lay, ch), { s: 168, sel: laySel, interactive: true, label: true, volOf: i2 => ch[i2]?.vol });
+      });
+      const drop = () => { const was = dragEl; dragEl = null; if (was) rd(); };
+      elWrap.addEventListener('pointerup', drop); elWrap.addEventListener('pointercancel', drop);
+    }
+    const elDel = $('#elDel'); if (elDel) elDel.onclick = () => { lay = lay.filter(x => x.id !== laySel); laySel = null; rd(); };
+    const elCh = $('#elCh'); if (elCh) elCh.onchange = () => { const it = lay.find(x => x.id === laySel); if (it) { it.ch = elCh.value; rd(); } };
+    const elChN = $('#elChN'); if (elChN) elChN.onchange = () => { const it = lay.find(x => x.id === laySel); if (it) { it.chN = clamp(Math.round(+elChN.value || 4), 1, 12); rd(); } };
+    const elPlay = $('#elPlay'); if (elPlay) elPlay.onclick = async () => {
+      const it = lay.find(x => x.id === laySel), c = ch.find(q => q.id === it?.ch); if (!c) return;
+      const r2 = await SND.toggle(m, c);
+      if (r2 === 'kosong') A.hint('Channel ini belum punya file suara — unggah lewat ikon 🎵 di tabel channel.', 5000);
+      rd(); A.refresh();
+    };
     dlg.querySelectorAll('[data-j]').forEach(inp => inp.onchange = () => {
       const k = inp.dataset.j, cat = k.slice(0, -1), idx = +k.slice(-1);
       au.jadwal[cat][idx] = clamp(Math.round(+inp.value || 0), 0, 24);
@@ -730,14 +801,38 @@ export function dlgAudio() {
     $('#auBatal').onclick = () => dlg.close();
     $('#auOk').onclick = () => {
       A.commit();
-      m.kabel = { ch: ch.map(c => ({ ...c })) };   // id ikut disimpan agar file suara per channel tetap terpaut
-      m.audio = { items: au.items.filter(i => i.n > 0), jadwal: au.jadwal };
+      m.kabel = { ...(m.kabel?.rute ? { rute: m.kabel.rute } : {}), ch: ch.map(({ warna, ...c }) => ({ ...c })) };   // id ikut disimpan agar suara & jalur kabel tetap terpaut
+      m.audio = { items: au.items.filter(i => i.n > 0), jadwal: au.jadwal, layout: lay.map(x => ({ ...x })) };
       dlg.close(); A.save(); A.renderAll(); A.hint('Pengaturan ruang audio & channel disimpan — lihat mode "Kabel" dan "Cek dB".', 6000);
     };
   };
   render();
 }
 const NAMA_ALL = Object.fromEntries([...AMPLI.map(([k, n]) => [k, n]), ...AUDIO_ALAT]);
+// kenop ampli mengikuti volume channel: item ampli diberi offset urutan channel-nya
+function layVol(lay, ch) {
+  let off = 0;
+  return lay.map(it => { if (A2K.has(it.t)) { const o = { ...it, _off: off }; off += it.chN || 4; return o; } return it; });
+}
+
+// ---------- susunan tweeter pada LMB (tampak depan) ----------
+export function dlgLMB(it) {
+  const tw = { a: 2, s: 4, b: 0, ...(it.lmbTw || {}) };
+  const render = () => {
+    openDlg('Susunan tweeter di LMB — tampak depan',
+      `<p class="lead">Atur tweeter AX-65 yang dipasang di sekeliling LMB (DED: 2 tarik di bibir atas + 4 inap di sisi). Jumlahnya ikut dihitung di analisis, kabel channel lantai ini, dan RAB.</p>
+       <div class="g3"><div><label>Tarik di bibir atas</label><input id="lmA" type="number" min="0" max="6" value="${tw.a}"></div>
+       <div><label>Inap di sisi kiri-kanan</label><input id="lmS" type="number" min="0" max="8" value="${tw.s}"></div>
+       <div><label>Inap di bawah</label><input id="lmB" type="number" min="0" max="6" value="${tw.b}"></div></div>
+       <div class="rvfig">${lmbFrontSVG(it, tw)}</div>
+       <p class="tip">Merah = tweeter tarik (menghadap keluar, memanggil masuk); ungu = tweeter inap. Tweeter hexagonal dipasang terpisah tepat di atas LMB (item "Tweeter hexagonal").</p>`,
+      `<button type="button" class="pl-btn" id="lmBatal">Batal</button><button type="button" class="pl-btn pl-blue" id="lmOk">Simpan</button>`, 'mid');
+    ['lmA', 'lmS', 'lmB'].forEach((id2, i2) => $('#' + id2).onchange = e => { tw[['a', 's', 'b'][i2]] = clamp(Math.round(+e.target.value || 0), 0, 8); render(); });
+    $('#lmBatal').onclick = () => dlg.close();
+    $('#lmOk').onclick = () => { A.commit(); it.lmbTw = { a: tw.a, s: tw.s, b: tw.b }; dlg.close(); A.save(); A.renderAll(); };
+  };
+  render();
+}
 
 // ---------- RAB perlengkapan ----------
 export function dlgRAB() {

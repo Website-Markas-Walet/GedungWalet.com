@@ -323,6 +323,12 @@ body.pl-lock .pl #dlg{visibility:visible}
 .pl-plan .sndm circle{transform-box:fill-box;transform-origin:center;animation:sndp 1.1s ease-out infinite}
 @keyframes sndp{0%{transform:scale(.55);opacity:1}80%{transform:scale(1.5);opacity:.1}100%{transform:scale(1.55);opacity:0}}
 .pl-dlg .mini.on2{background:#2E7D32;border-color:#2E7D32;color:#fff}
+/* elevasi ruang audio (tampak depan) di dialog */
+.pl-dlg .elwrap{background:#efece6;border:1px solid var(--line);border-radius:8px;padding:2px}
+.pl-dlg .elwrap svg{display:block}
+.pl-dlg .elpal .mini{font-size:11.5px}
+.pl-dlg .elsel{background:#f4f7fb;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.pl-dlg .elsel select,.pl-dlg .elsel input{width:auto;padding:4px 6px;font-size:12.5px}
 /* daftar centang lembar PDF */
 .pl-dlg .pdfl{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
 .pl-dlg .pdfl .chk{margin:5px 0}

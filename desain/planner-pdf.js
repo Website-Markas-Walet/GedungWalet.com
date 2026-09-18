@@ -13,6 +13,7 @@ import { rabRows } from './planner-rab.js';
 import { climate, simulateAir } from './planner-air.js';
 import { analyze } from './planner-analysis.js';
 import { makeSheetCanvas, pagesPDF } from './planner-export.js';
+import { audioElevSVG, defaultLayout, AMPLI_KEYS } from './planner-audio2d.js';
 
 export const LEMBAR = [
   ['tarik', 'Denah suara tarik (tweeter & kabel)'],
@@ -31,7 +32,8 @@ export const LEMBAR = [
   ['rab', 'RAB perlengkapan'],
 ];
 
-const PW = 1754, PH = 1240, MG = 56, RIGHT = 430, PADF = 26, PADL = PADF + 104;   // A4 melintang 150 dpi
+const PW = 1754, PH = 1240, MG = 56, RIGHT = 430, PADF = 26, PADL = PADF + 104;   // tata letak A4 melintang (satuan 150 dpi)
+const K = 1.7;                                                                    // dirender ±255 dpi supaya PDF tajam (HD)
 const FONT = 'Roboto, Arial, sans-serif', HEAD = 'Raleway, Roboto, Arial, sans-serif';
 const fmt = n => (+n).toLocaleString('id-ID');
 const svgUrl = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.includes('xmlns=') ? svg : svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
@@ -46,8 +48,9 @@ function wrap(c, text, maxW) {
   return out;
 }
 function page(judul, m, no, total) {
-  const cv = document.createElement('canvas'); cv.width = PW; cv.height = PH;
+  const cv = document.createElement('canvas'); cv.width = Math.round(PW * K); cv.height = Math.round(PH * K);
   const c = cv.getContext('2d');
+  c.scale(K, K);   // koordinat tetap 1754×1240; gambar & teks dirender pada resolusi K× (SVG ikut tajam)
   c.fillStyle = '#fff'; c.fillRect(0, 0, PW, PH);
   c.fillStyle = '#1565C0'; c.fillRect(0, 0, PW, 8);
   c.fillStyle = '#1a1a1a'; c.font = `800 30px ${HEAD}`; c.fillText(judul, MG, 58);
@@ -147,6 +150,7 @@ export async function buildPDF(m, keys, img3d, prog = () => {}) {
   for (const [k, nm] of sel) {
     no++; prog(`Menyusun lembar ${no}/${total}: ${nm}…`);
     await new Promise(r => setTimeout(r));   // beri napas UI
+    try {
     if (k === 'lengkap') { cvs.push(await makeSheetCanvas(m, a, img3d)); continue; }
     if (k === 'analisis') { cvs.push(analisisPage(m, a, no, total)); continue; }
     if (k === 'rab') { rabPages(m, a, cab, no, total).forEach(cv => cvs.push(cv)); continue; }
@@ -273,9 +277,19 @@ export async function buildPDF(m, keys, img3d, prog = () => {}) {
     await drawFloors(cv, c, m, spec, {});
     rightCol(c, o);
     cvs.push(cv);
+    } catch (e) {   // satu lembar gagal tidak menggagalkan seluruh PDF — halaman pengganti + lembar lain tetap jadi
+      console.error('lembar', k, e);
+      const { cv, c } = page(`Lembar ${nm}`, m, no, total);
+      c.fillStyle = '#C62828'; c.font = `700 20px ${HEAD}`;
+      c.fillText('Lembar ini gagal dibuat pada desain ini — lembar lain tetap tersusun.', MG, 170);
+      c.fillStyle = '#5a6472'; c.font = `13px ${FONT}`;
+      wrap(c, `Rincian teknis: ${e?.message || e}`, PW - 2 * MG).forEach((l, i2) => c.fillText(l, MG, 200 + i2 * 18));
+      c.fillText('Coba lagi setelah membuka mode terkait di editor, atau kirim link desain ke tim GedungWalet.com.', MG, 260);
+      cvs.push(cv);
+    }
   }
   prog('Membungkus PDF…');
-  return pagesPDF(cvs, 0.9);
+  return pagesPDF(cvs, 0.92);
 }
 const sv2 = m => (m.survey?.rh === 'lembab' ? 2 : RULES.ventJarak);
 
@@ -358,16 +372,20 @@ function rabPages(m, a, cab, no, totalLbr) {
   }
   return out;
 }
-// Lembar ruang audio: denah lantai ruang audio + tabel channel + perangkat + jadwal.
+// Lembar ruang audio: DESAIN RUANG AUDIO tampak depan (dinding berisi perangkat) + tabel channel + perangkat + jadwal.
 async function audioPage(m, a, cab, chs, no, total) {
-  const { cv, c } = page('Lembar denah & isi ruang audio', m, no, total);
-  const LV = levels(m), li = cab?.au?.li ?? 0, F = floorRect(m, LV[li]);
-  const s = Math.min(560 / (m.w + 12), (PH - 220) / (m.h + 4), 34);
-  const svg = floorSVG(m, li, s, { pfx: 'pdfau', chain: false, labels: true, show: it => (it.t === 'audio' ? 1 : ['pintu', 'tangga'].includes(it.t) ? 0.7 : 0.18), cables: cab ? { runs: cab.chs.flatMap(ch => ch.runs.filter(r => r.f === li).map(r => ({ warna: ch.warna, pts: r.pts, on: true }))), riser: cab.riser } : null });
+  const { cv, c } = page('Lembar desain ruang audio (tampak depan)', m, no, total);
+  const LV = levels(m);
+  let off = 0;
+  let lay = Array.isArray(m.audio?.layout) && m.audio.layout.length ? m.audio.layout : defaultLayout(m.audio, chs);
+  lay = lay.map(it => { if (AMPLI_KEYS.has(it.t)) { const o2 = { ...it, _off: off }; off += it.chN || 4; return o2; } return it; });
+  const svg = audioElevSVG(chs, lay, { s: 200, label: true, volOf: i2 => chs[i2]?.vol });
   const im = await loadImg(svgUrl(svg));
-  c.font = `700 15px ${HEAD}`; c.fillStyle = '#1a1a1a'; c.fillText(`${LV[li].name} — posisi ruang audio${cab?.luar ? ' (di luar gedung)' : ''}`, MG, 130);
-  c.drawImage(im, MG, 140);
-  const x = MG + im.width + 40, w = PW - MG - x;
+  const sc = Math.min(1, (PW - 2 * MG - 580) / im.width, (PH - 190) / im.height);
+  c.font = `700 15px ${HEAD}`; c.fillStyle = '#1a1a1a';
+  c.fillText(`Dinding ruang audio${cab?.luar ? ' (ruang di luar gedung)' : cab?.au ? ` (di ${LV[cab.au.li].name})` : ''} — semua kabel dari RBW berujung di sini`, MG, 128);
+  c.drawImage(im, MG, 140, im.width * sc, im.height * sc);
+  const x = MG + im.width * sc + 36, w = PW - MG - x;
   let y = 136;
   c.font = `700 17px ${HEAD}`; c.fillText('Channel & kabel', x, y); y += 10;
   const head = ['Channel', 'Sumber', 'Vol', 'Kabel', 'Suara / flashdisk'];

@@ -5,20 +5,25 @@ import { derive, structure, center, WALL_T, floorRect, floorHt, wallSideRuns, le
 
 const f1 = v => Math.round(v * 10) / 10;
 const fmt = n => (+n).toLocaleString('id-ID');
+// teks label harus di-escape: "< 0,01 lux" berisi '<' yang membuat SVG tidak valid saat dirender ke PDF/thumbnail
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const TXT = 'font-family="Roboto, Arial, sans-serif" fill="#3a4452"';
 export const RESIZABLE = new Set(['void', 'jalur', 'inap', 'audio', 'kolam', 'tangga', 'menara', 'lmb', 'lar', 'larj', 'pintu']);
 const OBJ_Z = { kolam: 0, tangga: 1, menara: 2, vent: 3, lar: 4, larj: 4, pintu: 4, lmb: 5, twinap: 6, twtarik: 7, hexa: 8, sarang: 9 };
 const lockGlyph = (x, y) => `<g transform="translate(${f1(x)} ${f1(y)})" pointer-events="none"><rect x="-4.5" y="-1.5" width="9" height="7" rx="1.5" fill="#C62828"/><path d="M-2.6 -1.5v-2.2a2.6 2.6 0 0 1 5.2 0v2.2" fill="none" stroke="#C62828" stroke-width="1.4"/></g>`;
 const mtxt = v => `${v.toFixed(2).replace('.', ',')} m`;
 
-// Simbol tweeter berbentuk corong: leher kecil di belakang, mulut melebar ke arah hadap (dir, derajat layar),
-// + 2 gelombang suara di depan mulutnya.
+// Simbol tweeter gaya Audax AX-65 (tampak atas): magnet kotak di belakang, corong kotak melebar ke arah hadap
+// (dir, derajat layar), pelat muka persegi, + 2 gelombang suara di depan mulutnya.
 export function tweeterSym(cx, cy, dir, color, r) {
-  const L = r * 2.3, a = -L / 2, k = a + L * 0.34, n0 = r * 0.3, n1 = r * 0.95;
-  const P = [[a, -n0], [k, -n0], [L / 2, -n1], [L / 2, n1], [k, n0], [a, n0]].map(([x, y]) => `${f1(x)},${f1(y)}`).join(' ');
+  const L = r * 2.3, a = -L / 2, k = a + L * 0.42, n0 = r * 0.34, n1 = r * 0.92, F = L / 2;
+  const P = [[k, -n0], [F, -n1], [F, n1], [k, n0]].map(([x, y]) => `${f1(x)},${f1(y)}`).join(' ');
   const arc = R => { const x = R * Math.cos(0.66), y = R * Math.sin(0.66); return `M${f1(x)} ${f1(-y)}A${f1(R)} ${f1(R)} 0 0 1 ${f1(x)} ${f1(y)}`; };
-  return `<g transform="translate(${f1(cx)} ${f1(cy)}) rotate(${f1(dir)})"><polygon points="${P}" fill="${color}" stroke="#fff" stroke-width=".6" stroke-linejoin="round"/>`
-    + `<path d="${arc(L / 2 + r * 0.55)}${arc(L / 2 + r * 1.15)}" fill="none" stroke="${color}" stroke-opacity=".7" stroke-width="1" stroke-linecap="round"/></g>`
+  return `<g transform="translate(${f1(cx)} ${f1(cy)}) rotate(${f1(dir)})">`
+    + `<rect x="${f1(a)}" y="${f1(-n0)}" width="${f1(k - a)}" height="${f1(2 * n0)}" fill="${color}" stroke="#fff" stroke-width=".6"/>`   // magnet
+    + `<polygon points="${P}" fill="${color}" stroke="#fff" stroke-width=".6" stroke-linejoin="round"/>`                                   // corong kotak
+    + `<rect x="${f1(F - r * 0.16)}" y="${f1(-n1 - r * 0.18)}" width="${f1(r * 0.3)}" height="${f1(2 * (n1 + r * 0.18))}" fill="${color}"/>`   // pelat muka persegi
+    + `<path d="${arc(F + r * 0.6)}${arc(F + r * 1.2)}" fill="none" stroke="${color}" stroke-opacity=".7" stroke-width="1" stroke-linecap="round"/></g>`
     + `<circle cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(Math.max(6, r * 2))}" fill="#fff" fill-opacity="0"/>`;
 }
 const twR = (it, S) => Math.max(2.2, S(it.w) * 0.42);
@@ -240,7 +245,7 @@ export function drawFloor(m, i, o = {}) {
         const ly = Math.max(Y(e.cy), last + 14); last = ly;
         L.push(`<polyline points="${f1(lx + 4)},${f1(ly - 3)} ${f1(X(F.x) - 5)},${f1(ly - 3)} ${X(e.cx)},${Y(e.cy)}" fill="none" stroke="#9aa1a9" stroke-width=".8"/>`
           + `<circle cx="${X(e.cx)}" cy="${Y(e.cy)}" r="1.6" fill="#9aa1a9"/>`
-          + `<text x="${f1(lx)}" y="${f1(ly)}" font-size="10" text-anchor="end" ${TXT}>${e.nm}</text>`);
+          + `<text x="${f1(lx)}" y="${f1(ly)}" font-size="10" text-anchor="end" ${TXT}>${esc(e.nm)}</text>`);
       });
       out.push(`<g pointer-events="none" opacity=".9">${L.join('')}</g>`);
     }
@@ -281,7 +286,7 @@ export function drawFloor(m, i, o = {}) {
   (o.luxLabels || []).forEach(l => {
     const x = X(l.x), y = Y(l.y), w = l.txt.length * 6.1 + 14;
     out.push(`<g pointer-events="none"><rect x="${f1(x - w / 2)}" y="${f1(y - 10)}" width="${f1(w)}" height="20" rx="10" fill="#fff" fill-opacity=".92" stroke="${l.bad ? '#C62828' : '#8b95a3'}"/>`
-      + `<text x="${x}" y="${f1(y + 4)}" font-size="11" text-anchor="middle" font-weight="600" fill="${l.bad ? '#C62828' : '#1a2230'}" font-family="Roboto, Arial, sans-serif">${l.txt}</text></g>`);
+      + `<text x="${x}" y="${f1(y + 4)}" font-size="11" text-anchor="middle" font-weight="600" fill="${l.bad ? '#C62828' : '#1a2230'}" font-family="Roboto, Arial, sans-serif">${esc(l.txt)}</text></g>`);
   });
 
   // ukuran & judul lantai
