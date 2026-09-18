@@ -14,8 +14,9 @@ const geoCache = new Map(), matCache = new Map();
 const st = { view: 'iso', mode: 'semua', burung: true, peta: 'nyaman', udara: false, walk: false };   // pilihan toolbar 3D
 let last = null, camKey = '', camTween = null, W3 = null, B3 = null, simSig = '', birds = [], flow = null, tags = [], junk = [], tPrev = 0, statT = 0, pergi = 0, siteT = { href: null, tex: null };
 const GAP = 2.5;        // jarak antar lantai pada tampilan terurai (m)
-// mode "jalan di dalam" (POV manusia): posisi, arah pandang, tinggi mata, lantai, senter
-const wk = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, h: 1.6, lv: 0, senter: false, keys: {}, stair: null, cam: null };
+// mode "jalan di dalam": posisi, arah pandang, tinggi mata, lantai, senter; tps = sudut pandang orang ketiga
+const wk = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, h: 1.6, lv: 0, senter: false, tps: false, keys: {}, stair: null, cam: null };
+let person = null;   // sosok manusia untuk mode orang ketiga
 
 const COL = {
   slab: 0xd9d4c7, wallOut: 0xf0ede6, sekat: 0x3a3f45, bata: 0xb3a08c, sirip: 0x8a5a2b, jalur: 0x1d9e75, lmb: 0xd85a30, void: 0x378add,
@@ -56,6 +57,7 @@ export function mount(el) {
     const b = e.target.closest('button[data-v]'); if (!b) return;
     const g = b.parentElement.dataset.g, v = b.dataset.v;
     if (v === 'walk') walkToggle();
+    else if (v === 'tps') { wk.tps = !wk.tps; }
     else if (g === 'view') { st.view = v; camPreset(true); }
     else if (g === 'mode') { st.mode = v; rebuild(); }
     else if (v === 'peta') { st.peta = st.peta === 'nyaman' ? 'lux' : st.peta === 'lux' ? '' : 'nyaman'; rebuild(); }
@@ -86,7 +88,7 @@ export function mount(el) {
 function renderBar() {
   const grp = (g, list) => `<div class="grp" data-g="${g}">${list.map(([v, t, on]) => `<button type="button" data-v="${v}" class="${on ? 'on' : ''}">${t}</button>`).join('')}</div>`;
   bar.innerHTML = wk.on
-    ? grp('walk', [['walk', '✕ Keluar mode jalan', true], ['senter', '🔦 Senter (T)', wk.senter]])
+    ? grp('walk', [['walk', '✕ Keluar mode jalan', true], ['tps', wk.tps ? '👤 Orang ketiga' : '👁 Pandangan mata', wk.tps], ['senter', '🔦 Senter (T)', wk.senter]])
     : grp('view', [['iso', '3D'], ['atas', 'Atas'], ['depan', 'Depan'], ['belakang', 'Belakang'], ['kiri', 'Kiri'], ['kanan', 'Kanan']].map(([v, t]) => [v, t, st.view === v]))
     + grp('mode', [['semua', 'Semua lantai'], ['lantai', 'Per lantai'], ['terurai', 'Terurai']].map(([v, t]) => [v, t, st.mode === v]))
     + grp('sim', [['burung', 'Burung walet', st.burung], ['peta', `Peta: ${st.peta === 'nyaman' ? 'kenyamanan' : st.peta === 'lux' ? 'lux' : 'mati'}`, !!st.peta], ['udara', 'Aliran udara', st.udara]])
@@ -180,7 +182,14 @@ export function build(model, active = 0, opts = {}) {
     const semua = st.mode === 'semua';
     const op = semua ? (i > active ? 0.1 : i === active ? 0.35 : 0) : 0.28;   // dinding luar: lantai aktif tembus pandang
     const opS = semua && i > active ? 0.08 : 0.6;                              // sekat walet (terpal)
-    if (!mn) box(F.w, 0.12, F.h, COL.slab, X(F.x + F.w / 2), y0 + 0.06, Z(F.y + F.h / 2), semua && i > active ? 0.12 : 0);   // menara: terbuka ke void
+    if (!mn) {   // pelat lantai dilubangi void & lubang LAL (tangga lantai di bawahnya) — untuk jelajah naik-turun
+      const holes = fl.items.filter(it => it.t === 'void').concat(i > 0 && !LV[i - 1].menara ? LV[i - 1].items.filter(it => it.t === 'tangga') : []);
+      let pieces = [F];
+      holes.forEach(h2 => { pieces = pieces.flatMap(r => rectDiff(r, h2)); });
+      pieces.forEach(r => box(r.w, 0.12, r.h, COL.slab, X(r.x + r.w / 2), y0 + 0.06, Z(r.y + r.h / 2), semua && i > active ? 0.12 : 0));
+      if (i > 0) holes.slice(fl.items.filter(it => it.t === 'void').length).forEach(t =>   // bingkai lubang LAL
+        box(t.w + 0.08, 0.13, t.h + 0.08, COL.tangga, X(t.x + t.w / 2), y0 + 0.06, Z(t.y + t.h / 2), 0.65));
+    }
     const st0 = model.showStruktur !== false ? structure(model, F) : null;
 
     // dinding luar & sekat — terpotong bukaan (LAR pintu 0–2 m, LAR jendela 1 m di bagian atas, LMB di bawah plafon)
@@ -550,8 +559,19 @@ function sunSetup(S) {
   W3sun = { jam: +S.jam, arah: night ? '' : arahNama(sp.az), el: sp.el };
 }
 
-// ---------- mode "jalan di dalam" (POV manusia; tinggi mata bisa diatur, bisa naik tangga, bawa senter) ----------
+// ---------- mode "jalan di dalam" (POV / orang ketiga; tinggi bisa diatur, naik-turun lewat tangga/LAL, bawa senter) ----------
 function senterSet(on) { wk.senter = on; }
+// sosok manusia sederhana (menghadap −z, titik asal di kaki, tinggi ±1 lalu diskalakan ke tinggi orang)
+function personMesh() {
+  const g = new THREE.Group(), mB = mat(0x2f5f8a, 0), mK = mat(0x263238, 0), mH = mat(0xd9a066, 0);
+  const add = (geo, m2, y) => { const ms = new THREE.Mesh(geo, m2); ms.position.y = y; ms.castShadow = true; g.add(ms); return ms; };
+  add(cached('p-kaki', () => new THREE.CylinderGeometry(0.075, 0.06, 0.44, 8)), mK, 0.22);
+  add(cached('p-badan', () => new THREE.CylinderGeometry(0.11, 0.13, 0.38, 10)), mB, 0.63);
+  add(cached('p-kepala', () => new THREE.SphereGeometry(0.1, 10, 8)), mH, 0.94);
+  const tangan = cached('p-tangan', () => new THREE.CylinderGeometry(0.032, 0.028, 0.34, 6));
+  [-0.16, 0.16].forEach(x => { const ms = add(tangan, mB, 0.62); ms.position.x = x; ms.rotation.z = x < 0 ? 0.12 : -0.12; });
+  return g;
+}
 function walkToggle() {
   wk.on = !wk.on;
   if (wk.on) {
@@ -565,6 +585,7 @@ function walkToggle() {
     if (wk.cam) { camera.position.copy(wk.cam.p); controls.target.copy(wk.cam.t); controls.update(); }
     camera.rotation.set(0, 0, 0);
     senter.intensity = 0;
+    if (person) person.visible = false;
     if (lightBase) { sunL.intensity = lightBase.sun; hemi.intensity = lightBase.hemi; scene.background = lightBase.bg; }
   }
   if (sync3) sync3.visible = wk.on;
@@ -579,9 +600,10 @@ function tickWalk(dt) {
   if (wk.keys.a || wk.keys.arrowleft) mx -= 1;
   if (wk.keys.d || wk.keys.arrowright) mx += 1;
   if (mx || mz) {
+    // maju (W) = arah pandang: kamera menghadap (−sin yaw, −cos yaw); samping = tegak lurusnya
     const n = Math.hypot(mx, mz), sy = Math.sin(wk.yaw), cy = Math.cos(wk.yaw);
-    wk.x += ((mx * cy - mz * sy) / n) * sp * dt;          // maju = arah pandang (yaw), samping = tegak lurusnya
-    wk.z += ((-mx * sy - mz * cy) / n) * sp * dt;
+    wk.x += ((mx * cy + mz * sy) / n) * sp * dt;
+    wk.z += ((-mx * sy + mz * cy) / n) * sp * dt;
     wk.x = Math.max(-B3.W / 2 - 8, Math.min(B3.W / 2 + 8, wk.x));
     wk.z = Math.max(-B3.L / 2 - 8, Math.min(B3.L / 2 + 8, wk.z));
   }
@@ -600,8 +622,20 @@ function tickWalk(dt) {
     if (prog >= 0.97) wk.lv = on.fi + 1;
     else if (prog <= 0.03) wk.lv = on.fi;
   } else wk.stair = null;
-  camera.position.set(wk.x, y + wk.h, wk.z);
-  camera.rotation.order = 'YXZ'; camera.rotation.set(wk.pitch, wk.yaw, 0);
+  const fx = -Math.sin(wk.yaw), fz = -Math.cos(wk.yaw);   // arah pandang mendatar
+  if (!person) { person = personMesh(); scene.add(person); }
+  person.visible = wk.tps;
+  if (wk.tps) {   // orang ketiga: sosok berjalan, kamera mengikuti dari belakang-atas
+    person.position.set(wk.x, y, wk.z);
+    person.rotation.y = wk.yaw + Math.PI;
+    person.scale.setScalar(Math.max(1.3, wk.h + 0.1));
+    const d = 3.1, up = 1.35;
+    camera.position.set(wk.x - fx * d, y + wk.h + up - Math.sin(wk.pitch) * 2, wk.z - fz * d);
+    camera.lookAt(wk.x + fx * 1.6, y + wk.h * 0.75, wk.z + fz * 1.6);
+  } else {
+    camera.position.set(wk.x, y + wk.h, wk.z);
+    camera.rotation.order = 'YXZ'; camera.rotation.set(wk.pitch, wk.yaw, 0);
+  }
   // gelap seperti aslinya: cahaya mengikuti lux di posisi (di luar gedung = terang); senter menembus gelap
   const luar = px < -0.2 || px > B3.W + 0.2 || py < -0.2 || py > B3.L + 0.2 || y > B3.top - 0.1;
   const q = !luar && W3?.at ? W3.at(Math.min(wk.lv, B3.base.length - 1), px, py) : null;
@@ -624,9 +658,9 @@ function statSet() {
   if (wk.on) {
     const lv = B3 ? Math.min(wk.lv, B3.base.length - 1) : 0;
     const lux = wk.lux == null ? 'di luar (terang)' : wk.lux < 0.01 ? '< 0,01 lux — gelap pekat' : `±${(wk.lux < 10 ? wk.lux.toFixed(1) : Math.round(wk.lux)).toString().replace('.', ',')} lux`;
-    statBox.innerHTML = `🚶 <b>Mode jalan</b> · ${last ? levels(last.model)[lv]?.name || '' : ''} · ${lux}`
-      + `<br>WASD / panah = jalan · seret = menoleh · naiki kotak tangga untuk pindah lantai · T = senter · Esc = keluar`
-      + `<br>Tinggi mata <button type="button" data-wkh="-">−</button> <b>${wk.h.toFixed(2).replace('.', ',')} m</b> <button type="button" data-wkh="+">+</button>`
+    statBox.innerHTML = `🚶 <b>Mode jalan${wk.tps ? ' · orang ketiga' : ''}</b> · ${last ? levels(last.model)[lv]?.name || '' : ''} · ${lux}`
+      + `<br>WASD / panah = jalan · seret = menoleh · naik-turun lewat tangga / lubang LAL · T = senter · Esc = keluar`
+      + `<br>Tinggi orang <button type="button" data-wkh="-">−</button> <b>${wk.h.toFixed(2).replace('.', ',')} m</b> <button type="button" data-wkh="+">+</button>`
       + ` · garis oranye menyala = rantai tweeter tarik sinkron`;
     statBox.hidden = false;
     return;
