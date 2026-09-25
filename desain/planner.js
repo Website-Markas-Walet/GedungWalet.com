@@ -35,6 +35,30 @@ let sel = new Set();                                   // id objek & sekat terpi
 let undoStack = [], redoStack = [];
 let spaceDown = false, measures = [], luxOn = false, luxRes = null, airOn = false, dbOn = false, kabelOn = false, mark = null, pendRute = null;
 let hidCh = new Set(), kabelSemua = false, lblOn = true;   // sembunyikan jalur per channel · daftar channel semua/lantai ini · keterangan ruang
+// coretan pena (stylus/jari/mouse) di atas denah — alat presentasi, tidak ikut desain/link
+let coret = [], penTimer = null;
+const penCfg = { w: 4, warna: '#E91E63', temp: false, fade: 10, hapus: false };
+const PEN_WARNA = [['#E91E63', 'Merah muda'], ['#C62828', 'Merah'], ['#1565C0', 'Biru'], ['#2E7D32', 'Hijau'], ['#1a1a1a', 'Hitam']];
+function penTick() {
+  const t = Date.now(), n0 = coret.length;
+  coret = coret.filter(s => !s.temp || t - s.t0 < s.fade * 1000);
+  if (coret.length !== n0 || coret.some(s => s.temp && t - s.t0 > s.fade * 1000 - 900)) renderPlan();
+  if (!coret.some(s => s.temp)) { clearInterval(penTimer); penTimer = null; }
+}
+function penMulaiTimer() { if (!penTimer && coret.some(s => s.temp)) penTimer = setInterval(penTick, 150); }
+function hapusCoretDi(p) {
+  const tol = Math.max(0.12, (8 + penCfg.w) / vp.s);
+  const kena = s => s.pts.some(([x, y], i) => {
+    if (Math.hypot(p.x - x, p.y - y) < tol) return true;
+    if (!i) return false;
+    const [x0, y0] = s.pts[i - 1], dx = x - x0, dy = y - y0, L2 = dx * dx + dy * dy || 1e-9;
+    const t = clamp(((p.x - x0) * dx + (p.y - y0) * dy) / L2, 0, 1);
+    return Math.hypot(p.x - x0 - t * dx, p.y - y0 - t * dy) < tol;
+  });
+  const n0 = coret.length;
+  coret = coret.filter(s => s.f !== cur || !kena(s));
+  if (coret.length !== n0) renderPlan();
+}
 let catTab = 'katalog', hid = new Set(), focus = null, openT = new Set();   // daftar item: disembunyikan / fokus (tidak ikut desain)
 // kartu panel kanan yang dilipat (judul sebelum "—"); tersimpan per perangkat agar panel tidak menumpuk
 let closedCards = new Set(['Sketsa tangan', 'Papan sirip', 'Ukuran gedung', 'Penggaris', 'Ruang dari sekat', 'Lokasi (satelit)']);
@@ -51,6 +75,7 @@ function normalize(m) {
   m.kolom = m.kolom || RULES.kolom;
   if (m.showStruktur === undefined) m.showStruktur = true;
   m.siripTebal = m.siripTebal || RULES.siripTebalCm; m.siripLebar = m.siripLebar || RULES.siripLebarCm;
+  m.papanPjg = clamp(+m.papanPjg || RULES.papanPanjang, 1, 6);   // panjang papan per batang saat pesan di toko (m)
   m.floors.forEach((f, i) => { f.name = `Lantai ${i + 1}`; f.items = f.items || []; f.walls = f.walls || []; delete f.menara; });
   liftMenara(m);
   if (m.menara) {
@@ -322,7 +347,7 @@ function openMenara() {
 }
 function renderTools() {
   const sk = SK.getSketch(model, cur), b = (t, ic, title) => `<button type="button" data-tool="${t}" class="${tool === t ? 'on' : ''}" title="${title}">${icon(ic)}</button>`;
-  $('#tools').innerHTML = `${b('select', 'select', 'Pilih / geser objek (V) — seret area kosong untuk memilih banyak')}${b('geser', 'hand', 'Geser tampilan (H) — atau tahan Spasi / seret tombol tengah mouse')}${b('sekat', 'wall', 'Gambar sekat walet (W)')}${b('ukur', 'ruler', 'Penggaris (M)')}
+  $('#tools').innerHTML = `${b('select', 'select', 'Pilih / geser objek (V) — seret area kosong untuk memilih banyak')}${b('geser', 'hand', 'Geser tampilan (H) — atau tahan Spasi / seret tombol tengah mouse')}${b('sekat', 'wall', 'Gambar sekat walet (W)')}${b('ukur', 'ruler', 'Penggaris (M)')}${b('coret', 'pencil', 'Coretan pena — stylus / jari / mouse (C); ketebalan, penghapus & pena sementara di panel kanan')}
    <span class="sep"></span>
    <button type="button" id="tUndo" title="Undo (Ctrl+Z)" ${undoStack.length ? '' : 'disabled'}>${icon('undo')}</button>
    <button type="button" id="tRedo" title="Redo (Ctrl+Y)" ${redoStack.length ? '' : 'disabled'}>${icon('redo')}</button>
@@ -366,6 +391,7 @@ function setTool(t) {
   if (t === 'sekat' || t === 'calib' || t.startsWith('place:')) sel.clear();
   renderCatalog(); renderTools(); renderPlan(); renderSide();
   if (t === 'ukur') hint('Penggaris: seret dari titik ke titik — menempel ke ujung sekat, sudut, dan tepi objek. Shift = lurus. Esc = hapus ukuran.', 7000);
+  if (t === 'coret') hint('Coretan: seret dengan stylus / jari / mouse. Atur ketebalan, warna, penghapus, dan pena sementara di panel kanan. Esc = selesai.', 8000);
   if (t === 'geser') hint('Geser tampilan: seret denah. Tekan H atau V untuk kembali memilih objek.');
 }
 let hintT;
@@ -419,7 +445,7 @@ function cableRuns() {
 }
 function renderPlan() {
   const r = svg.getBoundingClientRect(); if (!r.width || !model) return;
-  svg.setAttribute('class', 'pl-plan' + (tool === 'sekat' ? ' t-sekat' : tool.startsWith('place:') || tool === 'calib' ? ' t-place' : tool === 'ukur' ? ' t-ukur' : tool === 'site' ? ' t-site' : '')
+  svg.setAttribute('class', 'pl-plan' + (tool === 'sekat' ? ' t-sekat' : tool.startsWith('place:') || tool === 'calib' ? ' t-place' : tool === 'ukur' || tool === 'coret' ? ' t-ukur' : tool === 'site' ? ' t-site' : '')
     + (tool === 'geser' || spaceDown ? ' t-geser' : '') + (drag?.mode === 'pan' ? ' panning' : ''));
   der = derive(model, floor());
   const sk = SK.getSketch(model, cur), L = luxOn ? (drag ? luxRes : luxEnsure()) : null, lf = L?.floors[cur];
@@ -445,6 +471,17 @@ function renderPlan() {
         }));
       if (rings.length) html += `<g class="sndm" pointer-events="none">${rings.join('')}</g>`;
     } catch {}
+  }
+  // coretan pena (permanen & sementara — yang sementara memudar lalu hilang)
+  if (coret.length || drag?.mode === 'coret') {
+    const t = Date.now(), P2 = p2 => `${round(vp.ox + p2[0] * vp.s, 1)} ${round(vp.oy + p2[1] * vp.s, 1)}`;
+    const paths = coret.filter(s2 => s2.f === cur).map(s2 => {
+      let op = 0.9;
+      if (s2.temp) { const sisa = s2.fade * 1000 - (t - s2.t0); if (sisa <= 0) return ''; op = sisa < 700 ? Math.max(0.02, (0.9 * sisa) / 700) : 0.9; }
+      return `<path d="M${s2.pts.map(P2).join(' L')}" fill="none" stroke="${s2.warna}" stroke-width="${s2.w}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`;
+    });
+    if (drag?.mode === 'coret' && drag.pts.length > 1) paths.push(`<path d="M${drag.pts.map(P2).join(' L')}" fill="none" stroke="${penCfg.warna}" stroke-width="${penCfg.w}" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`);
+    html += `<g pointer-events="none">${paths.join('')}</g>`;
   }
   // pratinjau jalur kabel manual yang sedang digambar
   if (tool === 'rute' && pendRute) {
@@ -595,6 +632,11 @@ svg.addEventListener('pointerdown', e => {
   if (tool === 'calib') return calibClick(p);
   if (tool === 'ukur') { const a = magnet(p, true); drag = { mode: 'ukur', x1: a.x, y1: a.y, x2: a.x, y2: a.y }; capture(e); return; }
   if (tool === 'sekat') { const a = magnet(p); drag = { mode: 'wall', x1: a.x, y1: a.y, x2: a.x, y2: a.y }; capture(e); return; }
+  if (tool === 'coret') {   // coretan pena: gambar bebas / penghapus
+    if (penCfg.hapus) { drag = { mode: 'coretHapus' }; hapusCoretDi(p); }
+    else drag = { mode: 'coret', pts: [[round(p.x, 3), round(p.y, 3)]] };
+    capture(e); return;
+  }
   if (tool === 'rute') {   // gambar jalur kabel manual: klik titik-titik (otomatis siku), Enter/dobel-klik selesai
     if (!pendRute) { setTool('select'); return; }
     let q = { x: snap(p.x), y: snap(p.y) };
@@ -637,6 +679,12 @@ svg.addEventListener('pointermove', e => {
   if (drag.mode === 'pan') { vp.ox = drag.ox + e.clientX - drag.sx; vp.oy = drag.oy + e.clientY - drag.sy; renderPlan(); return; }
   const p = pt(e);
   if (drag.mode === 'marquee' || drag.mode === 'link') { drag.x2 = p.x; drag.y2 = p.y; renderPlan(); return; }
+  if (drag.mode === 'coret') {
+    const last = drag.pts[drag.pts.length - 1];
+    if (Math.hypot(p.x - last[0], p.y - last[1]) > 1.4 / vp.s) { drag.pts.push([round(p.x, 3), round(p.y, 3)]); renderPlan(); }
+    return;
+  }
+  if (drag.mode === 'coretHapus') { hapusCoretDi(p); return; }
   if (drag.mode === 'siteMove') { drag.sk.cx = round(drag.cx0 + p.x - drag.p0.x); drag.sk.cy = round(drag.cy0 + p.y - drag.p0.y); renderPlan(); return; }
   if (drag.mode === 'siteScale') {
     const c = { x: drag.sk.cx ?? model.w / 2, y: drag.sk.cy ?? model.h / 2 };
@@ -706,7 +754,11 @@ svg.addEventListener('pointerup', e => {
   } else if (dm === 'ukur') {
     const len = Math.hypot(drag.x2 - drag.x1, drag.y2 - drag.y1);
     if (len >= 0.05) { measures.push({ f: cur, x1: drag.x1, y1: drag.y1, x2: drag.x2, y2: drag.y2 }); measures = measures.slice(-40); hint(`Jarak ${len.toFixed(2).replace('.', ',')} m`); }
-  } else if (dm === 'siteMove' || dm === 'siteScale') SK.setSketch(model, 100, { ...drag.sk });
+  } else if (dm === 'coret') {
+    if (drag.pts.length >= 2) { coret.push({ f: cur, pts: drag.pts, w: penCfg.w, warna: penCfg.warna, temp: penCfg.temp, fade: penCfg.fade, t0: Date.now() }); penMulaiTimer(); }
+    coret = coret.slice(-120);
+  } else if (dm === 'coretHapus') { /* selesai menghapus */ }
+  else if (dm === 'siteMove' || dm === 'siteScale') SK.setSketch(model, 100, { ...drag.sk });
   else if (dm === 'link') linkDrop(e);
   else if (dm !== 'pan' && drag.moved) {
     if ((dm === 'wallend' || dm === 'wallmove') && findWall(drag.id)) joinWall(findWall(drag.id));
@@ -743,6 +795,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'v') setTool('select');
   else if (k === 'w') setTool('sekat');
   else if (k === 'm') setTool(tool === 'ukur' ? 'select' : 'ukur');
+  else if (k === 'c') setTool(tool === 'coret' ? 'select' : 'coret');
   else if (k === 'h') setTool(tool === 'geser' ? 'select' : 'geser');
   else if (k === 'l' && sel.size) toggleLock();
   else if (k === 'r' && single()?.kind === 'item') turnSel();
@@ -1285,6 +1338,28 @@ function luxCard() {
 function bindLuxCard() {
   $('#props').querySelectorAll('tr.fl[data-f]').forEach(tr => tr.onclick = () => goLevel(+tr.dataset.f));
 }
+// Kartu pengaturan coretan pena: ketebalan, warna, penghapus, pena sementara (memudar 5 detik – 1 menit).
+function penCard() {
+  const n = coret.filter(s => s.f === cur).length;
+  return `<div class="card"><h4>${icon('pencil', 14)} Coretan pena — ${floor().name}</h4>
+    <div class="row"><span class="k">Ketebalan pena <b>${penCfg.w}px</b></span><input type="range" id="pnW" min="1" max="14" step="1" value="${penCfg.w}"></div>
+    ${rowSel('Warna', 'pnC', PEN_WARNA, penCfg.warna)}
+    <label class="chkrow"><input type="checkbox" id="pnHapus"${penCfg.hapus ? ' checked' : ''}> Mode penghapus (seret di atas coretan)</label>
+    <label class="chkrow"><input type="checkbox" id="pnTemp"${penCfg.temp ? ' checked' : ''}> Pena sementara — coretan hilang sendiri</label>
+    ${penCfg.temp ? `<div class="row"><span class="k">Hilang setelah <b>${penCfg.fade} detik</b></span><input type="range" id="pnFade" min="5" max="60" step="5" value="${penCfg.fade}"></div>` : ''}
+    ${rowInfo('Coretan di lantai ini', n)}
+    <div class="acts"><button type="button" id="pnClr" class="danger">${icon('trash', 14)} Hapus semua (lantai ini)</button></div>
+    <p class="tip">Untuk mencoret-coret saat menjelaskan — pakai stylus, jari, mouse, atau trackpad. Coretan hanya tampilan sesi ini: tidak ikut desain, link, maupun PDF.</p></div>`;
+}
+function bindPenCard() {
+  const on = (id, fn, ev = 'onchange') => { const el = $('#' + id); if (el) el[ev] = fn; };
+  on('pnW', e => { penCfg.w = clamp(Math.round(+e.target.value), 1, 14); renderSide(false); }, 'oninput');
+  const c = $('#props [data-p="pnC"]'); if (c) c.onchange = e => { penCfg.warna = e.target.value; };
+  on('pnHapus', e => { penCfg.hapus = e.target.checked; renderPlan(); hint(penCfg.hapus ? 'Penghapus aktif — seret di atas coretan untuk menghapusnya.' : 'Kembali ke pena.'); });
+  on('pnTemp', e => { penCfg.temp = e.target.checked; renderSide(false); });
+  on('pnFade', e => { penCfg.fade = clamp(Math.round(+e.target.value), 5, 60); renderSide(false); }, 'oninput');
+  on('pnClr', () => { coret = coret.filter(s => s.f !== cur); renderPlan(); renderSide(false); }, 'onclick');
+}
 function measureCard() {
   const ms = measures.filter(q => q.f === cur); if (!ms.length && tool !== 'ukur') return '';
   return `<div class="card"><h4>${icon('ruler', 14)} Penggaris — ${floor().name}</h4>
@@ -1297,12 +1372,13 @@ function siripCard() {
   return `<div class="card"><h4>Papan sirip</h4>
     <div class="row"><span class="k">Tebal papan (cm)</span><input type="number" step="0.5" min="1" max="10" id="sT" value="${model.siripTebal}"></div>
     <div class="row"><span class="k">Lebar papan (cm)</span><input type="number" step="1" min="5" max="40" id="sL" value="${model.siripLebar}"></div>
-    ${a ? rowInfo('Total papan sirip', `${fmt(a.siripM)} m`) + rowInfo('Volume kayu', `<b>${fmt(a.siripM3)} m³</b>`) + rowInfo(`Perkiraan batang @${RULES.papanPanjang} m`, `± ${fmt(a.siripBatang)} batang`) : ''}
-    <p class="tip">Seluruh ruang inap di semua lantai, termasuk papan yang menempel di sisi berdinding/bersekat. Belum termasuk sisa potong (tambahkan ±10%). Umumnya papan meranti 2×20 cm.</p></div>`;
+    <div class="row"><span class="k">Panjang per batang di toko (m)</span><input type="number" step="0.5" min="1" max="6" id="sP" value="${model.papanPjg || RULES.papanPanjang}"></div>
+    ${a ? rowInfo('Total papan sirip', `${fmt(a.siripM)} m`) + rowInfo('Volume kayu (dari tebal × lebar)', `<b>${fmt(a.siripM3)} m³</b>`) + rowInfo(`Total batang @${fmt(model.papanPjg || RULES.papanPanjang)} m`, `<b>± ${fmt(a.siripBatang)} batang</b>`) : ''}
+    <p class="tip">Volume dihitung dari tebal × lebar × total meter; jumlah batang = total meter ÷ panjang papan yang dijual toko. Termasuk papan yang menempel di sisi berdinding. Belum termasuk sisa potong (tambahkan ±10%). Umumnya papan meranti 2×20 cm @4 m.</p></div>`;
 }
 function projectPanel() {
   $('#props').innerHTML = (view === '3d' ? birdCard() : '') + (luxOn || airOn || dbOn || view === '3d' ? simCard() : '') + (luxOn ? luxCard() : '')
-    + (airOn ? airCard() + iklimCard() : '') + (dbOn ? dbCard() : '') + (kabelOn ? kabelCard() : '') + measureCard() + floorPanel() + roomsCard() + sketchCard() + siteCard() + siripCard() + `<div class="card"><h4>Ukuran gedung (lantai dasar)</h4>
+    + (tool === 'coret' ? penCard() : '') + (airOn ? airCard() + iklimCard() : '') + (dbOn ? dbCard() : '') + (kabelOn ? kabelCard() : '') + measureCard() + floorPanel() + roomsCard() + sketchCard() + siteCard() + siripCard() + `<div class="card"><h4>Ukuran gedung (lantai dasar)</h4>
     <div class="row"><span class="k">Lebar (m)</span><input type="number" step="0.5" min="2" max="40" id="pW" value="${model.w}"></div>
     <div class="row"><span class="k">Panjang (m)</span><input type="number" step="0.5" min="2" max="60" id="pH" value="${model.h}"></div>
     <div class="row"><span class="k">Tinggi lantai standar (m)</span><input type="number" step="0.1" min="1.8" max="4" id="pFH" value="${model.floorH}"></div>
@@ -1318,8 +1394,9 @@ function projectPanel() {
   $('#pSurvey').onclick = () => D.dlgSurvey({ regenerate: true });
   $('#sT').onchange = e => { commit(); model.siripTebal = clamp(+e.target.value || RULES.siripTebalCm, 1, 10); renderAll(); };
   $('#sL').onchange = e => { commit(); model.siripLebar = clamp(+e.target.value || RULES.siripLebarCm, 5, 40); renderAll(); };
+  $('#sP').onchange = e => { commit(); model.papanPjg = clamp(+e.target.value || RULES.papanPanjang, 1, 6); renderAll(); };
   const u = $('#uClr'); if (u) u.onclick = () => { measures = measures.filter(q => q.f !== cur); renderPlan(); renderSide(); };
-  bindFloorPanel(); bindSketchCard(); bindLuxCard(); bindSimCard(); bindAirCard(); bindSiteCard();
+  bindFloorPanel(); bindSketchCard(); bindLuxCard(); bindSimCard(); bindAirCard(); bindSiteCard(); bindPenCard();
   ['dbAudio', 'kbAudio'].forEach(id => { const b = $('#' + id); if (b) b.onclick = () => D.dlgAudio(); });
   $('#props').querySelectorAll('[data-rt]').forEach(b => b.onclick = () => startRute(b.dataset.rt));
   $('#props').querySelectorAll('[data-rtdel]').forEach(b => b.onclick = () => delRute(b.dataset.rtdel));

@@ -240,9 +240,10 @@ export function analyze(m) {
   if (!notes.length) info('Semua aturan dasar terpenuhi. Detail arah LMB, suara, dan iklim mikro dibahas saat konsultasi.');
   score = Math.max(0, Math.min(100, Math.round(score)));
   const siripM = Math.round(sirip), sarang = Math.round(sirip * RULES.sarangPerMeterSirip);
-  const siripM3 = Math.round(siripVolume(m, sirip) * 100) / 100, siripBatang = Math.ceil(sirip / RULES.papanPanjang);
+  const papanPjg = Math.min(6, Math.max(1, +m.papanPjg || RULES.papanPanjang));   // panjang papan per batang di toko
+  const siripM3 = Math.round(siripVolume(m, sirip) * 100) / 100, siripBatang = Math.ceil(sirip / papanPjg);
   const kgRef = RULES.produksi6x12KgTahun.map(k => r1((k * luasTotal) / (72 * 2)));
   const channels = kabel?.chs.length || 2 * nF + (hexas.length ? 1 : 0);   // channel dari pengaturan kabel (tab Ruang audio)
   return { score, siripM, siripM3, siripBatang, sarang, inapN, ventN, kolamN, lmbN, menaraN, hexaN: hexas.length, twinapN, twtarikN, channels,
-    kabelM: kabel ? Math.round(kabel.total) : 0, klemN: kabel ? kabel.klem : 0, sarangN, luas: rects[0].w * rects[0].h, luasTotal, tinggi, notes, rekom, kgRef, lux, iklim, db };
+    kabelM: kabel ? Math.round(kabel.total) : 0, klemN: kabel ? kabel.klem : 0, sarangN, papanPjg, luas: rects[0].w * rects[0].h, luasTotal, tinggi, notes, rekom, kgRef, lux, iklim, db };
 }

@@ -43,7 +43,7 @@ export async function makeSheetCanvas(m, a, img3d) {
   const stats = [
     ['Luas bangunan', `${fmt(Math.round(a.luasTotal * 10) / 10)} m²`],
     ['Sirip efektif (ruang inap)', `${fmt(a.siripM)} m`],
-    ['Papan sirip', `${fmt(a.siripM3)} m³ · ${m.siripTebal || RULES.siripTebalCm}×${m.siripLebar || RULES.siripLebarCm} cm · ±${fmt(a.siripBatang)} batang`],
+    ['Papan sirip', `${fmt(a.siripM3)} m³ · ${m.siripTebal || RULES.siripTebalCm}×${m.siripLebar || RULES.siripLebarCm} cm · ±${fmt(a.siripBatang)} batang @${fmt(a.papanPjg || RULES.papanPanjang)} m`],
     ['Sarang efektif*', `± ${fmt(a.sarang)} sarang`],
     ...(a.lux ? [['Cahaya ruang inap (simulasi)', `maks ${luxTxt(a.lux.maxInap)}`]] : []),
     ['Referensi produksi**', `${fmt(a.kgRef[0])}–${fmt(a.kgRef[1])} kg/tahun`],

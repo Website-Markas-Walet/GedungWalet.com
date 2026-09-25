@@ -186,7 +186,7 @@ export async function buildPDF(m, keys, img3d, prog = () => {}) {
         'Ruang jalur ikut diberi sirip (paling lama ditempati burung karena remang) dan dihitung sarang. Sarang efektif hanya dari papan sirip di ruang inap & jalur — bukan void.',
         'Garis tipis di dalam ruang = arah & jarak sirip; garis tebal di tepi = papan yang menempel dinding.',
       ];
-      o.stats = [['Total papan sirip', `${fmt(a?.siripM ?? 0)} m`], ['Volume kayu', `${fmt(a?.siripM3 ?? 0)} m³`], [`Perkiraan batang @${RULES.papanPanjang} m`, `± ${fmt(a?.siripBatang ?? 0)}`], ['Sarang efektif*', `± ${fmt(a?.sarang ?? 0)}`]];
+      o.stats = [['Total papan sirip', `${fmt(a?.siripM ?? 0)} m`], ['Volume kayu', `${fmt(a?.siripM3 ?? 0)} m³`], [`Total batang @${fmt(a?.papanPjg ?? RULES.papanPanjang)} m (toko)`, `± ${fmt(a?.siripBatang ?? 0)}`], ['Sarang efektif*', `± ${fmt(a?.sarang ?? 0)}`]];
       o.legend = [{ ...(await sym('inap')), t: 'Ruang inap + sirip (garis = arah sirip)' }, { ...(await sym('jalur')), t: 'Ruang jalur + sirip' }];
       o.foot = `*Asumsi ${RULES.sarangPerMeterSirip} sarang per meter sirip; belum termasuk sisa potong ±10%. ` + o.foot;
     } else if (k === 'tata') {
