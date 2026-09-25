@@ -10,7 +10,13 @@ const TXT = 'font-family="Roboto, Arial, sans-serif" fill="#2b3440"';
 export const AMPLI_KEYS = new Set(AMPLI.map(a => a[0]));
 export const NAMA_ALAT = Object.fromEntries([...AMPLI.map(([k, n]) => [k, n]), ...AUDIO_ALAT]);
 // ukuran gambar tiap jenis (m) pada elevasi
-export const ELEV_UKUR = { twk: [0.24, 0.2], saklar: [0.22, 0.14], stopkontak: [0.4, 0.12], timerKitani: [0.16, 0.22], timerAC: [0.16, 0.22], kipas: [0.2, 0.2], aki: [0.34, 0.24], lampu: [0.12, 0.16], flashdisk: [0.1, 0.05], axm: [0.62, 0.24], piro88: [0.62, 0.24], piro89: [0.62, 0.24] };
+export const ELEV_UKUR = { twk: [0.24, 0.2], saklar: [0.22, 0.14], stopkontak: [0.4, 0.12], timerKitani: [0.16, 0.22], timerAC: [0.16, 0.22], kipas: [0.2, 0.2], aki: [0.34, 0.24], lampu: [0.12, 0.16], flashdisk: [0.1, 0.05], axm: [0.62, 0.24], piro88: [0.8, 0.15], piro89: [0.8, 0.15] };   // Piro lebih pipih & panjang
+const AMPLI_LABEL = { axm: 'AXM-GARUDA', piro88: 'PIRO 88', piro89: 'PIRO 89' };
+// posisi kenop channel ke-k pada ampli (meter dinding) — kenop = volume channel; kabel tweeter berujung di sini
+export function ampKnob(it, k) {
+  const [w, h] = ELEV_UKUR[it.t] || [0.6, 0.2], n = Math.max(2, Math.min(12, it.chN || 4));
+  return { x: it.x - w / 2 + w * (0.34 + (0.6 * (k + 0.5)) / n), y: it.y - h / 2 + h * 0.32 };
+}
 
 // Tata letak awal (meniru foto): tweeter kontrol per channel berderet di papan atas, saklar di bawahnya,
 // stop kontak & lampu di tengah, ampli berjajar di meja, timer & kipas dekat ampli, aki di bawah meja.
@@ -60,16 +66,18 @@ function alatSVG(it, s, X, Y, ch, o) {
   } else if (it.t === 'aki') g = `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(W)}" height="${f1(H)}" rx="2" fill="#e8e6df" stroke="#9a988f"/><rect x="${f1(x)}" y="${f1(y)}" width="${f1(W)}" height="${f1(H * 0.28)}" fill="#2f6f4f"/><rect x="${f1(x + W * 0.12)}" y="${f1(y - 4)}" width="5" height="5" fill="#b23"/><rect x="${f1(x + W * 0.78)}" y="${f1(y - 4)}" width="5" height="5" fill="#345"/><text x="${f1(cx)}" y="${f1(y + H * 0.7)}" font-size="8" text-anchor="middle" ${TXT}>AKI</text>`;
   else if (it.t === 'lampu') g = `<line x1="${f1(cx)}" y1="${f1(y)}" x2="${f1(cx)}" y2="${f1(cy - H * 0.1)}" stroke="#777"/><circle cx="${f1(cx)}" cy="${f1(cy + H * 0.12)}" r="${f1(W * 0.5)}" fill="#fff3c2" stroke="#d8c88a"/>`;
   else if (it.t === 'flashdisk') g = `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(W)}" height="${f1(H)}" rx="1.5" fill="#3b6ea5" stroke="#2b4d73"/>`;
-  else if (AMPLI_KEYS.has(it.t)) {   // ampli AXM Garuda / Piro: rak hitam, layar, kenop volume per channel (kenop = volume channel RBW)
-    const nCh = Math.max(2, Math.min(12, it.chN || 4));
+  else if (AMPLI_KEYS.has(it.t)) {   // ampli: rak hitam, layar, kenop volume per channel (kenop = volume channel RBW)
+    const nCh = Math.max(2, Math.min(12, it.chN || 4)), pipih = it.t !== 'axm';
     g = `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(W)}" height="${f1(H)}" rx="3" fill="#111318" stroke="#000"/>`
-      + `<rect x="${f1(x + W * 0.05)}" y="${f1(y + H * 0.14)}" width="${f1(W * 0.22)}" height="${f1(H * 0.3)}" fill="#20304a"/>`
-      + `<text x="${f1(x + W * 0.05)}" y="${f1(y + H * 0.88)}" font-size="7.5" fill="#c9a25a" font-family="Roboto, Arial, sans-serif">${esc((NAMA_ALAT[it.t] || '').replace('Ampli ', 'AUDAX '))}</text>`;
+      + (pipih ? '' : `<rect x="${f1(x + W * 0.05)}" y="${f1(y + H * 0.14)}" width="${f1(W * 0.22)}" height="${f1(H * 0.3)}" fill="#20304a"/>`)
+      + `<text x="${f1(x + W * 0.05)}" y="${f1(y + H * (pipih ? 0.8 : 0.88))}" font-size="${pipih ? 7 : 7.5}" fill="#c9a25a" font-family="Roboto, Arial, sans-serif">${esc(AMPLI_LABEL[it.t] || NAMA_ALAT[it.t] || it.t)}</text>`;
     for (let k = 0; k < nCh; k++) {
-      const kx = x + W * 0.34 + (W * 0.6 * (k + 0.5)) / nCh, ky = y + H * 0.32;
+      const kp = ampKnob(it, k), kx = X(kp.x), ky = Y(kp.y);
       const vol = o.volOf ? o.volOf((it._off || 0) + k) : null, ang = vol == null ? 40 : -120 + ((vol - 40) / 70) * 240;
-      g += `<circle cx="${f1(kx)}" cy="${f1(ky)}" r="${f1(Math.min(7, (W * 0.5) / nCh))}" fill="#caa64f" stroke="#7c6530"/>`
-        + `<line x1="${f1(kx)}" y1="${f1(ky)}" x2="${f1(kx + Math.cos(((ang - 90) * Math.PI) / 180) * 6)}" y2="${f1(ky + Math.sin(((ang - 90) * Math.PI) / 180) * 6)}" stroke="#40331a" stroke-width="1.4"/>`;
+      const kr = Math.min(pipih ? 6 : 7, (W * 0.5) / nCh, H * 0.3);
+      g += `<circle cx="${f1(kx)}" cy="${f1(ky)}" r="${f1(kr)}" fill="#caa64f" stroke="#7c6530"/>`
+        + `<line x1="${f1(kx)}" y1="${f1(ky)}" x2="${f1(kx + Math.cos(((ang - 90) * Math.PI) / 180) * kr * 0.85)}" y2="${f1(ky + Math.sin(((ang - 90) * Math.PI) / 180) * kr * 0.85)}" stroke="#40331a" stroke-width="1.4"/>`
+        + `<text x="${f1(kx)}" y="${f1(ky + kr + 8)}" font-size="6.5" text-anchor="middle" fill="#8d97a3" font-family="Roboto, Arial, sans-serif">${(it._off || 0) + k + 1}</text>`;
     }
   } else g = `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(W)}" height="${f1(H)}" fill="#ccc" stroke="#999"/>`;
   return g;
@@ -86,11 +94,31 @@ export function audioElevSVG(chs, layout, o = {}) {
   const meja = `<rect x="${X(0.15)}" y="${Y(MEJA_Y)}" width="${f1((WALL_W - 0.3) * s)}" height="${f1(0.05 * s)}" fill="#16181c"/>`
     + `<rect x="${X(0.3)}" y="${Y(MEJA_Y + 0.05)}" width="${f1(0.05 * s)}" height="${f1((WALL_H - MEJA_Y - 0.1) * s)}" fill="#16181c"/>`
     + `<rect x="${X(WALL_W - 0.35)}" y="${Y(MEJA_Y + 0.05)}" width="${f1(0.05 * s)}" height="${f1((WALL_H - MEJA_Y - 0.1) * s)}" fill="#16181c"/>`;
-  // kabel dari tiap tweeter kontrol turun rapi ke meja ampli (klem tiap 10 cm digambar sebagai titik)
-  const kabel = (layout || []).filter(it => it.t === 'twk').map(it => {
-    const c = chOf(it.ch), x = X(it.x), pts = [];
-    for (let yy = it.y + 0.14; yy < MEJA_Y - 0.03; yy += 0.1) pts.push(`<circle cx="${x}" cy="${Y(yy)}" r="1" fill="#fff" stroke="#aaa" stroke-width=".4"/>`);
-    return `<line x1="${x}" y1="${Y(it.y + 0.1)}" x2="${x}" y2="${Y(MEJA_Y)}" stroke="${c?.warna || '#333'}" stroke-width="1.6"/>` + pts.join('');
+  // kabel tiap tweeter kontrol menyambung ke KENOP CHANNEL-nya di ampli (kenop = volume channel): turun tegak,
+  // belok siku di jalur bertingkat (tweeter bertumpuk di atas → tiap channel dapat ketinggian belok sendiri agar rapi),
+  // lalu turun tepat ke kenopnya. Klem tiap 10 cm digambar sebagai titik.
+  const amps = (layout || []).filter(it => AMPLI_KEYS.has(it.t));
+  const knobOf = idx => {
+    for (const a of amps) { const n = Math.max(2, Math.min(12, a.chN || 4)), off = a._off || 0; if (idx >= off && idx < off + n) return ampKnob(a, idx - off); }
+    return null;
+  };
+  const kabel = (layout || []).filter(it => it.t === 'twk').map((it, i2) => {
+    const c = chOf(it.ch), col = c?.warna || '#333', idx = chs.findIndex(q => q.id === it.ch);
+    const x0 = it.x, yTop = it.y + (ELEV_UKUR.twk[1] / 2) - 0.02, kn = idx >= 0 ? knobOf(idx) : null;
+    const seg = [];
+    const klem = (xx, yA, yB) => { for (let yy = Math.min(yA, yB) + 0.05; yy < Math.max(yA, yB) - 0.02; yy += 0.1) seg.push(`<circle cx="${X(xx)}" cy="${Y(yy)}" r="1" fill="#fff" stroke="#aaa" stroke-width=".4"/>`); };
+    if (kn) {
+      const busY = Math.max(yTop + 0.06, Math.min(kn.y, MEJA_Y) - 0.14 - ((idx >= 0 ? idx : i2) % 12) * 0.03);
+      const p2 = Math.abs(kn.x - x0) < 0.015 ? [[x0, yTop], [x0, kn.y - 0.04]] : [[x0, yTop], [x0, busY], [kn.x, busY], [kn.x, kn.y - 0.04]];
+      seg.unshift(`<polyline points="${p2.map(([px, py]) => `${X(px)},${Y(py)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round"/>`
+        + `<circle cx="${X(kn.x)}" cy="${Y(kn.y - 0.03)}" r="1.8" fill="${col}"/>`);
+      klem(x0, yTop, p2.length > 2 ? busY : kn.y - 0.04);
+      if (p2.length > 2) klem(kn.x, busY, kn.y - 0.04);
+    } else {
+      seg.unshift(`<line x1="${X(x0)}" y1="${Y(yTop)}" x2="${X(x0)}" y2="${Y(MEJA_Y)}" stroke="${col}" stroke-width="1.6"/>`);
+      klem(x0, yTop, MEJA_Y);
+    }
+    return seg.join('');
   }).join('');
   const items = (layout || []).map(it => {
     const g = alatSVG(it, s, X, Y, chOf(it.ch), o);

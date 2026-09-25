@@ -179,7 +179,7 @@ export function dlgFinish() {
       `👤 Nama: ${m.owner || '-'}`, `📍 Lokasi: ${m.city || '-'}`, `🏠 Proyek: ${m.name || 'Rumah Walet'}`,
       `📐 Ukuran: ${fmt(m.w)} × ${fmt(m.h)} m, ${m.floors.length} lantai, tinggi ${fmt(m.floorH)} m`,
       `🪵 Sirip efektif (ruang inap): ±${fmt(a.siripM)} m (est. ±${fmt(a.sarang)} sarang)`,
-      `🪚 Papan sirip ${m.siripTebal || RULES.siripTebalCm}×${m.siripLebar || RULES.siripLebarCm} cm: ±${fmt(a.siripM3)} m³ (±${fmt(a.siripBatang)} batang @${RULES.papanPanjang} m)`,
+      `🪚 Papan sirip ${m.siripTebal || RULES.siripTebalCm}×${m.siripLebar || RULES.siripLebarCm} cm: ±${fmt(a.siripM3)} m³ (±${fmt(a.siripBatang)} batang @${fmt(a.papanPjg)} m)`,
       ...(a.lux ? [`💡 Cahaya ruang inap (simulasi): maks ${luxTxt(a.lux.maxInap)}`] : []),
       `🔊 Tweeter inap ${a.twinapN} · tarik ${a.twtarikN} · channel ampli ${a.channels}`,
       ...(a.kabelM ? [`🔌 Kabel tweeter ±${fmt(a.kabelM)} m · klem kabel ±${fmt(a.klemN)} (tiap 10 cm)`] : []),
@@ -341,14 +341,14 @@ export function buildShareLink(m) {
       ...(f.fw != null ? { r: [f.fx, f.fy, f.fw, f.fh] } : {}), ...(f.ht != null ? { t: f.ht } : {}),
     };
   }, floors = m.floors.map(encF);
-  const tb = m.siripTebal || RULES.siripTebalCm, lb = m.siripLebar || RULES.siripLebarCm;
+  const tb = m.siripTebal || RULES.siripTebalCm, lb = m.siripLebar || RULES.siripLebarCm, pj = +m.papanPjg || RULES.papanPanjang;
   const adaRab = m.rab && (Object.keys(m.rab.h || {}).length || Object.keys(m.rab.k || {}).length || (m.rab.x || []).length);
   const slim = { v: 6, n: m.name, o: m.owner, c: m.city, w: m.w, h: m.h, fh: m.floorH, k: m.kolom, st: m.showStruktur === false ? 0 : 1, s: m.survey || null, f: floors,
     ...(m.menara ? { mn: encF(m.menara) } : {}), ...(m.sim && Object.keys(m.sim).length ? { sm: m.sim } : {}),
     ...(m.audio ? { au: m.audio } : {}),
     ...(m.kabel?.ch?.length || m.kabel?.rute ? { kb: { ...(m.kabel.ch?.length ? { ch: m.kabel.ch } : {}), ...(m.kabel.rute && Object.keys(m.kabel.rute).length ? { r: m.kabel.rute } : {}) } } : {}),
     ...(adaRab ? { rb: m.rab } : {}),
-    ...(tb !== RULES.siripTebalCm || lb !== RULES.siripLebarCm ? { sp: [tb, lb] } : {}) };
+    ...(tb !== RULES.siripTebalCm || lb !== RULES.siripLebarCm || pj !== RULES.papanPanjang ? { sp: [tb, lb, pj] } : {}) };
   const json = JSON.stringify(slim);
   const enc = window.LZString ? LZString.compressToEncodedURIComponent(json) : encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
   return `${location.origin}/desain/#d=${enc}`;
@@ -402,7 +402,7 @@ export function parseShare(hash) {
     const model = {
       id: uid(), name: txt(s.n), owner: txt(s.o), city: txt(s.c), w: W, h: H, floorH: num(s.fh, 1.8, 4, 2),
       kolom: [3, 4, 5, 6].includes(+s.k) ? +s.k : RULES.kolom, showStruktur: s.st !== 0, created: Date.now(), ...(survey ? { survey } : {}),
-      ...(Array.isArray(s.sp) ? { siripTebal: num(s.sp[0], 1, 10, RULES.siripTebalCm), siripLebar: num(s.sp[1], 5, 40, RULES.siripLebarCm) } : {}),
+      ...(Array.isArray(s.sp) ? { siripTebal: num(s.sp[0], 1, 10, RULES.siripTebalCm), siripLebar: num(s.sp[1], 5, 40, RULES.siripLebarCm), ...(s.sp[2] != null ? { papanPjg: num(s.sp[2], 1, 6, RULES.papanPanjang) } : {}) } : {}),
       ...(s.lx != null ? { luxLuar: num(s.lx, 1000, 120000, RULES.cahayaLuar) } : {}),
       floors: (Array.isArray(s.f) ? s.f : []).slice(0, 8).map((f, i) => decF(f, `Lantai ${i + 1}`)),
     };
@@ -669,6 +669,7 @@ export function dlgAudio() {
     ...(m.menara ? [[m.floors.length, 'Menara']] : [])]
     .map(([k, t]) => `<option value="${k}"${fKey(v) === String(k) ? ' selected' : ''}>${t}</option>`).join('');
   const render = () => {
+    const sc0 = dlg.querySelector('.db')?.scrollTop || 0;   // jaga posisi gulir — jangan lompat ke atas tiap perubahan
     let cab = null; try { cab = cableInfo({ ...m, kabel: { ch } }); } catch {}
     const lenOf = c => cab?.chs.find(q => q.nm === c.nm && q.t === c.t && q.f === c.f)?.len;
     const kapasitas = au.items.filter(i => AMPLI_KEYS.has(i.t)).reduce((s, i) => s + (i.n || 0) * (i.ch || 4), 0);
@@ -770,7 +771,7 @@ export function dlgAudio() {
         if (!g) { if (laySel) { laySel = null; rd(); } return; }
         const it = lay.find(x => x.id === g.dataset.lid); if (!it) return;
         dragEl = { it, p0: toM(e), x0: it.x, y0: it.y, moved: false };
-        elWrap.setPointerCapture?.(e.pointerId);
+        try { elWrap.setPointerCapture?.(e.pointerId); } catch {}
         if (laySel !== it.id) { laySel = it.id; }
         e.preventDefault();
       });
@@ -782,7 +783,9 @@ export function dlgAudio() {
         dragEl.it.y = Math.round(clamp(dragEl.y0 + dy, 0.08, WALL_H - 0.08) * 100) / 100;
         elWrap.innerHTML = audioElevSVG(ch, layVol(lay, ch), { s: 168, sel: laySel, interactive: true, label: true, volOf: i2 => ch[i2]?.vol });
       });
-      const drop = () => { const was = dragEl; dragEl = null; if (was) rd(); };
+      // lepas: JANGAN render ulang seluruh dialog saat selesai menggeser (bikin gulir lompat) — svg sudah diperbarui live;
+      // render ulang hanya untuk klik-pilih (menampilkan baris kontrol item terpilih)
+      const drop = () => { const was = dragEl; dragEl = null; if (was && !was.moved) rd(); };
       elWrap.addEventListener('pointerup', drop); elWrap.addEventListener('pointercancel', drop);
     }
     const elDel = $('#elDel'); if (elDel) elDel.onclick = () => { lay = lay.filter(x => x.id !== laySel); laySel = null; rd(); };
@@ -798,6 +801,7 @@ export function dlgAudio() {
       const k = inp.dataset.j, cat = k.slice(0, -1), idx = +k.slice(-1);
       au.jadwal[cat][idx] = clamp(Math.round(+inp.value || 0), 0, 24);
     });
+    const db0 = dlg.querySelector('.db'); if (db0) db0.scrollTop = sc0;
     $('#auBatal').onclick = () => dlg.close();
     $('#auOk').onclick = () => {
       A.commit();
