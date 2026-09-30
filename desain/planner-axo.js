@@ -68,6 +68,28 @@ function build(m, o, stat, cab) {
     poly([pt(x1, y1, z), pt(x2, y2, z), pt(x2, y2, z + hh), pt(x1, y1, z + hh)], col, op, pal.line, sw, dash);
   const line = (a, b, st, sw = 0.9, dash = '', op = 1) => G.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${st}" stroke-width="${sw}"${dash ? ` stroke-dasharray="${dash}"` : ''} stroke-opacity="${op}"/>`);
   const dot = (x, y, z, r, col) => { const p = pt(x, y, z); G.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${f1(r)}" fill="${col}" stroke="${pal.bg}" stroke-width="0.7"/>`); };
+  // detail item: papan sirip nyata (jarak & arah sesuai item), corong tweeter, cangkir sarang, riak kolam, anak tangga
+  const siripLines = (r, z, step, col, op2 = 0.7, sw = 0.7) => {
+    const alongX = r.o ? r.o === 'x' : r.w >= r.h;   // papan sejajar sisi panjang; o memaksa arah
+    const span = alongX ? r.h : r.w, n = Math.max(2, Math.round(span / step));
+    for (let k2 = 1; k2 < n; k2++) {
+      const q = (k2 * span) / n;
+      line(pt(alongX ? r.x + 0.08 : r.x + q, alongX ? r.y + q : r.y + 0.08, z),
+        pt(alongX ? r.x + r.w - 0.08 : r.x + q, alongX ? r.y + q : r.y + r.h - 0.08, z), col, sw, '', op2);
+    }
+  };
+  const horn = (cx, cy, z, ang, col, sc2 = 1) => {   // tweeter AX-65: magnet kotak + corong trapesium menghadap ang (0°=+x)
+    const a = (ang * Math.PI) / 180, ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+    const L1 = 0.1 * sc2, L2 = 0.17 * sc2, w1 = 0.055 * sc2, w2 = 0.13 * sc2;
+    poly([pt(cx - ux * L1 + vx * w1, cy - uy * L1 + vy * w1, z), pt(cx + vx * w1, cy + vy * w1, z), pt(cx - vx * w1, cy - vy * w1, z), pt(cx - ux * L1 - vx * w1, cy - uy * L1 - vy * w1, z)], sh(col, 0.72), 1, pal.bg, 0.5);
+    poly([pt(cx + vx * w1, cy + vy * w1, z), pt(cx + ux * L2 + vx * w2, cy + uy * L2 + vy * w2, z), pt(cx + ux * L2 - vx * w2, cy + uy * L2 - vy * w2, z), pt(cx - vx * w1, cy - vy * w1, z)], col, 1, pal.bg, 0.5);
+  };
+  const sarangSym = (x, y, z, r, col) => { const p = pt(x, y, z); G.push(`<path d="M ${f1(p[0] - r)} ${f1(p[1])} a ${f1(r)} ${f1(r * 0.9)} 0 0 0 ${f1(2 * r)} 0 z" fill="${col}" stroke="${pal.bg}" stroke-width="0.6"/>`); };
+  const kolamSym = (it, z) => { const c = center(it), p = pt(c.x, c.y, z), r = Math.max(4, S * Math.min(it.w, it.h) * 0.28);
+    G.push(`<path d="M ${f1(p[0] - r)} ${f1(p[1])} q ${f1(r / 2)} ${f1(-r / 3)} ${f1(r)} 0 t ${f1(r)} 0" fill="none" stroke="${sh(zonaCol('kolam'), 0.6)}" stroke-width="0.9"/><path d="M ${f1(p[0] - r * 0.7)} ${f1(p[1] + r * 0.28)} q ${f1(r * 0.35)} ${f1(-r * 0.25)} ${f1(r * 0.7)} 0 t ${f1(r * 0.7)} 0" fill="none" stroke="${sh(zonaCol('kolam'), 0.6)}" stroke-width="0.8"/>`); };
+  const tanggaSym = (it, z) => { const alongX = it.w >= it.h, n = 5;
+    for (let k2 = 1; k2 < n; k2++) { const q = (k2 * (alongX ? it.w : it.h)) / n;
+      line(pt(alongX ? it.x + q : it.x + 0.06, alongX ? it.y + 0.06 : it.y + q, z), pt(alongX ? it.x + q : it.x + it.w - 0.06, alongX ? it.y + it.h - 0.06 : it.y + q, z), sh(zonaCol('tangga'), 0.62), 0.7, '', 0.85); } };
   const CO = [];   // keterangan {id,t,spec,warna,p:[x,y,z]}
   const co = (id, t, spec, warna, p) => CO.push({ id, t, spec, warna, p });
 
@@ -90,7 +112,12 @@ function build(m, o, stat, cab) {
     }
     const zs = ['inap', 'jalur', 'audio', 'kolam', 'tangga', 'pintu'];
     fl.items.filter(it => zs.includes(it.t)).sort((a, b) => a.x + a.y - b.x - b.y)
-      .forEach(it => flat(it.x, it.y, it.w, it.h, zt + 0.02, zonaCol(it.t), it.t === 'pintu' ? 0.9 : 0.75, sh(zonaCol(it.t), 0.7), 0.7));
+      .forEach(it => {
+        flat(it.x, it.y, it.w, it.h, zt + 0.02, zonaCol(it.t), it.t === 'pintu' ? 0.9 : 0.75, sh(zonaCol(it.t), 0.7), 0.7);
+        if (it.t === 'inap' || it.t === 'jalur') siripLines(it, zt + 0.04, Math.max(0.4, (it.gap || RULES.siripJarak) * 2), sh(zonaCol(it.t), 0.55), 0.5, 0.55);   // papan sirip (dijarangkan 2×)
+        if (it.t === 'kolam') kolamSym(it, zt + 0.05);
+        if (it.t === 'tangga') tanggaSym(it, zt + 0.04);
+      });
     fl.items.filter(it => it.t === 'void').forEach(v => {   // void = lubang gelap + silang
       flat(v.x, v.y, v.w, v.h, zt + 0.03, sh(zonaCol('void'), 0.55), 0.9, sh(zonaCol('void'), 0.5), 0.8);
       line(pt(v.x, v.y, zt + 0.03), pt(v.x + v.w, v.y + v.h, zt + 0.03), sh(zonaCol('void'), 0.45), 0.7);
@@ -108,20 +135,23 @@ function build(m, o, stat, cab) {
       const hb = gant ? ht * 0.45 : ht - 0.14, zb = gant ? zt + ht - 0.14 - hb : zt;
       wallQ(w.x1, w.y1, w.x2, w.y2, zb, hb, bata ? '#b6b3ab' : pal.sekat, bata ? 0.95 : 0.55, 0.8, gant ? ' stroke-dasharray="3 2"' : '');
     });
-    fl.items.filter(it => it.t === 'lmb').forEach(l => {   // LMB pada dinding
-      const hz = l.w >= l.h, cx = l.x + l.w / 2, cy = l.y + l.h / 2, half = Math.max(l.w, l.h) / 2;
-      wallQ(hz ? cx - half : cx, hz ? cy : cy - half, hz ? cx + half : cx, hz ? cy : cy + half, zt + ht * 0.45, (l.tcm ? l.tcm / 100 : 0.5), pal.lmb, 1, 0.7);
+    fl.items.filter(it => it.t === 'lmb').forEach(l => {   // LMB pada dinding: kusen terang + lubang gelap
+      const hz = l.w >= l.h, cx = l.x + l.w / 2, cy = l.y + l.h / 2, half = Math.max(l.w, l.h) / 2, th = l.tcm ? l.tcm / 100 : 0.5;
+      const seg = (hf, z2, hh2, col, sw2) => wallQ(hz ? cx - hf : cx, hz ? cy : cy - hf, hz ? cx + hf : cx, hz ? cy : cy + hf, z2, hh2, col, 1, sw2);
+      seg(half + 0.07, zt + ht * 0.45 - 0.07, th + 0.14, sh(pal.lmb, 1.25), 0.7);   // kusen
+      seg(half, zt + ht * 0.45, th, '#20242a', 0.6);                                // lubang dicat hitam
     });
     fl.items.filter(it => it.t === 'twinap' || it.t === 'twtarik').forEach(t => {
-      const c = center(t);
-      line(pt(c.x, c.y, zt), pt(c.x, c.y, zt + 0.42), pal[t.t], 0.8, '', 0.8);
-      dot(c.x, c.y, zt + 0.46, Math.max(1.6, S * 0.055), pal[t.t]);
+      const c = center(t), ang = Number.isFinite(t.dir) ? t.dir : 90;
+      line(pt(c.x, c.y, zt), pt(c.x, c.y, zt + 0.4), pal[t.t], 0.8, '', 0.8);       // tiang gantung
+      horn(c.x, c.y, zt + 0.42, ang, pal[t.t], 1);                                  // corong menghadap arahnya
     });
-    fl.items.filter(it => it.t === 'hexa').forEach(t => {   // hexagonal: segi enam kecil
-      const c = center(t), p = pt(c.x, c.y, zt + 0.9), r = Math.max(3, S * 0.14);
-      G.push(`<polygon points="${Array.from({ length: 6 }, (_, k) => `${f1(p[0] + r * Math.cos((k * 60 - 90) * Math.PI / 180))},${f1(p[1] + r * 0.86 * Math.sin((k * 60 - 90) * Math.PI / 180))}`).join(' ')}" fill="${pal.hexa}" stroke="${pal.bg}" stroke-width="0.7"/>`);
+    fl.items.filter(it => it.t === 'hexa').forEach(t => {   // hexagonal: 6 corong melingkar
+      const c = center(t), rr = 0.14;
+      line(pt(c.x, c.y, zt), pt(c.x, c.y, zt + 0.85), pal.hexa, 0.8, '', 0.7);
+      for (let k2 = 0; k2 < 6; k2++) { const a2 = ((k2 * 60 - 90) * Math.PI) / 180; dot(c.x + rr * Math.cos(a2), c.y + rr * Math.sin(a2), zt + 0.9, Math.max(1.4, S * 0.05), pal.hexa); }
     });
-    fl.items.filter(it => it.t === 'sarang').forEach(t => { const c = center(t); dot(c.x, c.y, zt + 0.1, Math.max(1.3, S * 0.045), pal.sarang); });
+    fl.items.filter(it => it.t === 'sarang').forEach(t => { const c = center(t); sarangSym(c.x, c.y, zt + 0.1, Math.max(1.8, S * 0.06), pal.sarang); });
     if (penuh) {   // dinding depan sangat tipis supaya isi terlihat
       wallQ(F.x, F.y + F.h, F.x + F.w, F.y + F.h, zt, ht, pal.wall, 0.1, 0.8);
       wallQ(F.x + F.w, F.y, F.x + F.w, F.y + F.h, zt, ht, pal.wall, 0.1, 0.8);
@@ -225,21 +255,26 @@ function build(m, o, stat, cab) {
       plate(z);
       LV.forEach(fl => (fl.walls || []).forEach(w => wallQ(w.x1, w.y1, w.x2, w.y2, z + 0.1, 0.9, w.bahan === 'bata' ? '#b6b3ab' : pal.sekat, w.bahan === 'bata' ? 0.95 : 0.5, 0.7, w.jenis === 'gantung' ? ' stroke-dasharray="3 2"' : '')));
     } });
-    if (angka.sirip) layers.push({ id: 'sirip', t: 'Papan sirip', spec: `${fmt(angka.sirip)} m · ${m.siripTebal || RULES.siripTebalCm}×${m.siripLebar || RULES.siripLebarCm} cm · ±${fmt(angka.btg ?? 0)} batang @${fmt(angka.pjg)} m`, col: pal.sirip, draw: z => {
+    if (angka.sirip) layers.push({ id: 'sirip', t: 'Papan sirip', spec: `${fmt(angka.sirip)} m · ${m.siripTebal || RULES.siripTebalCm}×${m.siripLebar || RULES.siripLebarCm} cm · jarak ${Math.round(RULES.siripJarak * 100)} cm · ±${fmt(angka.btg ?? 0)} batang @${fmt(angka.pjg)} m`, col: pal.sirip, draw: z => {
       plate(z);
       LV.forEach(fl => fl.items.filter(it => it.t === 'inap' || it.t === 'jalur').forEach(r => {
-        const hz = r.w >= r.h, n = Math.max(2, Math.floor((hz ? r.h : r.w) / 0.5));
-        for (let k = 1; k < n; k++) { const q = k * ((hz ? r.h : r.w) / n); line(pt(hz ? r.x + 0.1 : r.x + q, hz ? r.y + q : r.y + 0.1, z + 0.32), pt(hz ? r.x + r.w - 0.1 : r.x + q, hz ? r.y + q : r.y + r.h - 0.1, z + 0.32), pal.sirip, 0.7, '', 0.75); }
+        flat(r.x, r.y, r.w, r.h, z + 0.3, pal.bg, 0.35, sh(pal.sirip, 1.15), 0.5);
+        siripLines(r, z + 0.32, r.gap || RULES.siripJarak, pal.sirip, 0.8, 0.6);   // jarak papan sesungguhnya (25 cm standar)
       }));
     } });
     if (cab?.chs?.length) layers.push({ id: 'kabel', t: 'Jalur kabel per channel', spec: `±${fmt(angka.kbl ?? 0)} m · ${fmt(angka.klm ?? 0)} klem @10 cm · semua berujung di ruang audio`, col: '#c99700', draw: z => {
       plate(z);
       cab.chs.forEach(ch => ch.runs.forEach(r => { if (r.pts?.length > 1) G.push(`<polyline points="${r.pts.map(p => pt(p[0], p[1], z + 0.25).join(',')).join(' ')}" fill="none" stroke="${ch.warna}" stroke-width="1.1" stroke-opacity="0.9" stroke-linejoin="round"/>`); }));
     } });
-    if (angka.tw) layers.push({ id: 'twinap', t: 'Tweeter inap', spec: `${fmt(angka.tw)} titik · pola per baris 2-1-2 / 3-2-3 / 4-3-4`, col: pal.twinap, draw: z => { plate(z); itemsOf('twinap').forEach(t => { const c = center(t); dot(c.x, c.y, z + 0.3, Math.max(1.5, S * 0.05), pal.twinap); }); } });
-    if (angka.tt || angka.hx) layers.push({ id: 'twtarik', t: 'Tweeter tarik + hexagonal', spec: `${fmt(angka.tt ?? 0)} tarik · ${fmt(angka.hx ?? 0)} hexagonal (panggil)`, col: pal.twtarik, draw: z => { plate(z); itemsOf('twtarik').forEach(t => { const c = center(t); dot(c.x, c.y, z + 0.3, Math.max(1.5, S * 0.05), pal.twtarik); }); itemsOf('hexa').forEach(t => { const c = center(t); dot(c.x, c.y, z + 0.4, Math.max(2.2, S * 0.09), pal.hexa); }); } });
-    if (angka.lmb) layers.push({ id: 'lmb', t: 'LMB + LAR (bukaan)', spec: `${fmt(angka.lmb)} LMB · ${fmt(itemsOf('lar').length + itemsOf('larj').length)} LAR`, col: pal.lmb, draw: z => { plate(z); itemsOf('lmb').forEach(l => flat(l.x - 0.1, l.y - 0.1, l.w + 0.2, l.h + 0.2, z + 0.16, pal.lmb, 0.95, sh(pal.lmb, 0.7), 0.7)); [...itemsOf('lar'), ...itemsOf('larj')].forEach(l => flat(l.x, l.y, l.w, l.h, z + 0.14, pal.zona.jalur, 0.85, sh(pal.zona.jalur, 0.7), 0.6)); } });
-    if (angka.srg) layers.push({ id: 'sarang', t: 'Titik sarang', spec: SARANG_JENIS.map(([k]) => (srgO[k] ? `${fmt(srgO[k])} ${k}` : '')).filter(Boolean).join(' · ') || `${fmt(angka.srg)} titik`, col: pal.sarang, draw: z => { plate(z); itemsOf('sarang').forEach(t => { const c = center(t); dot(c.x, c.y, z + 0.2, Math.max(1.3, S * 0.045), pal.sarang); }); } });
+    if (angka.tw) layers.push({ id: 'twinap', t: 'Tweeter inap', spec: `${fmt(angka.tw)} titik · pola per baris 2-1-2 / 3-2-3 / 4-3-4`, col: pal.twinap, draw: z => { plate(z); itemsOf('twinap').forEach(t => horn(center(t).x, center(t).y, z + 0.28, Number.isFinite(t.dir) ? t.dir : 90, pal.twinap, 1.7)); } });
+    if (angka.tt || angka.hx) layers.push({ id: 'twtarik', t: 'Tweeter tarik + hexagonal', spec: `${fmt(angka.tt ?? 0)} tarik · ${fmt(angka.hx ?? 0)} hexagonal (panggil)`, col: pal.twtarik, draw: z => {
+      plate(z);
+      itemsOf('twtarik').forEach(t => horn(center(t).x, center(t).y, z + 0.28, Number.isFinite(t.dir) ? t.dir : 90, pal.twtarik, 1.7));
+      itemsOf('hexa').forEach(t => { const c = center(t); for (let k2 = 0; k2 < 6; k2++) { const a2 = ((k2 * 60 - 90) * Math.PI) / 180; dot(c.x + 0.16 * Math.cos(a2), c.y + 0.16 * Math.sin(a2), z + 0.3, Math.max(1.6, S * 0.055), pal.hexa); } });
+    } });
+    if (angka.lmb) layers.push({ id: 'lmb', t: 'LMB + LAR (bukaan)', spec: `${fmt(angka.lmb)} LMB · ${fmt(itemsOf('lar').length + itemsOf('larj').length)} LAR`, col: pal.lmb, draw: z => { plate(z); itemsOf('lmb').forEach(l => { flat(l.x - 0.14, l.y - 0.14, l.w + 0.28, l.h + 0.28, z + 0.15, sh(pal.lmb, 1.25), 0.95, sh(pal.lmb, 0.7), 0.6); flat(l.x, l.y, l.w, l.h, z + 0.17, '#20242a', 1, null, 0); }); [...itemsOf('lar'), ...itemsOf('larj')].forEach(l => flat(l.x, l.y, l.w, l.h, z + 0.14, pal.zona.jalur, 0.85, sh(pal.zona.jalur, 0.7), 0.6)); } });
+    if (stat?.ventN) layers.push({ id: 'vent', t: 'Ventilasi pipa 4"', spec: `${fmt(stat.ventN)} titik · tiap ±1 m, 60 cm di bawah sirip, elbow ke bawah`, col: pal.kolom, draw: z => { plate(z); itemsOf('vent').forEach(v => { const c = center(v); dot(c.x, c.y, z + 0.22, Math.max(1.6, S * 0.055), pal.bg === '#ffffff' ? '#8a939d' : pal.kolom); } ); } });
+    if (angka.srg) layers.push({ id: 'sarang', t: 'Titik sarang', spec: SARANG_JENIS.map(([k]) => (srgO[k] ? `${fmt(srgO[k])} ${k}` : '')).filter(Boolean).join(' · ') || `${fmt(angka.srg)} titik`, col: pal.sarang, draw: z => { plate(z); itemsOf('sarang').forEach(t => { const c = center(t); sarangSym(c.x, c.y, z + 0.2, Math.max(2, S * 0.065), pal.sarang); }); } });
     if (itemsOf('audio').length || m.audio) layers.push({ id: 'audio', t: 'Ruang audio', spec: `±${RULES.audioLuas} m² · ampli, timer, aki — semua kabel berujung di sini`, col: pal.zona.audio, draw: z => { plate(z); itemsOf('audio').forEach(a => prism(a.x, a.y, a.w, a.h, z + 0.1, 0.8, pal.zona.audio, 0.9, 0.7)); } });
     let z0 = 0, prevTop = -0.5;
     layers.forEach((ly, i) => {

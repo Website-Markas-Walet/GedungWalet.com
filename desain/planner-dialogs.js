@@ -10,6 +10,7 @@ import * as SK from './planner-sketch.js';
 import * as SND from './planner-suara.js';
 import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js';
 import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js';
+import * as SITE from './planner-site.js';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -352,6 +353,7 @@ export function buildShareLink(m) {
     ...(m.kabel?.ch?.length || m.kabel?.rute ? { kb: { ...(m.kabel.ch?.length ? { ch: m.kabel.ch } : {}), ...(m.kabel.rute && Object.keys(m.kabel.rute).length ? { r: m.kabel.rute } : {}) } } : {}),
     ...(adaRab ? { rb: m.rab } : {}),
     ...(adaPx ? { px: { t: px.tipe, p: px.palet, g: px.gap, r: px.garis ? 1 : 0, k: px.ket ? 1 : 0, ...(Object.keys(px.lbl || {}).length ? { l: px.lbl } : {}) } } : {}),
+    ...(m.lokasi && Number.isFinite(+m.lokasi.la) ? { lk: m.lokasi } : {}),
     ...(tb !== RULES.siripTebalCm || lb !== RULES.siripLebarCm || pj !== RULES.papanPanjang ? { sp: [tb, lb, pj] } : {}) };
   const json = JSON.stringify(slim);
   const enc = window.LZString ? LZString.compressToEncodedURIComponent(json) : encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
@@ -475,11 +477,13 @@ export function parseShare(hash) {
         if (typeof v.t === 'string') o2.t = v.t.slice(0, 60);
         if (typeof v.s === 'string') o2.s = v.s.slice(0, 90);
         if (v.on === 0) o2.on = 0;
+        if (v.sd === 'l' || v.sd === 'r') o2.sd = v.sd;
         if (v.dy != null) o2.dy = num(v.dy, -600, 600, 0);
         if (Object.keys(o2).length) p.lbl[k] = o2;
       });
       model.pres = p;
     }
+    if (s.lk) { const lk = SITE.bersihkanLokasi(s.lk); if (lk) model.lokasi = lk; }   // analisis lokasi (ringkasan kecil)
     model.floors.forEach(f => {   // buat ulang tweeter inap berpola standar untuk zona yang ditandai (semua ruang di dalamnya)
       const flagged = f.items.filter(z => z._auto); if (!flagged.length) return;
       const der = derive(model, f);
@@ -910,24 +914,47 @@ export function dlgPres() {
   const m = A.model;
   const p = m.pres = { ...AXO_DEFAULT, ...(m.pres && typeof m.pres === 'object' ? m.pres : {}) };
   p.lbl = { ...(p.lbl && typeof p.lbl === 'object' ? p.lbl : {}) };   // selalu salinan sendiri (AXO_DEFAULT.lbl jangan tercemar)
-  let stat = null, cab = null, committed = false;
+  let stat = null, cab = null, committed = false, tab = 'axo', sibuk = false;
   try { stat = A.analyze(); } catch {}
   try { cab = cableInfo(m); } catch {}
   const touch = () => { if (!committed) { A.commit(); committed = true; } };   // satu langkah undo per sesi dialog
   const svgOf = edit => axoSVG(m, { ...p, s: 26, edit, brand: !edit }, stat, cab);
   const refreshView = () => { const v = $('#pxView'); if (v) v.innerHTML = svgOf(true); };
+  const tabsBar = () => `<div class="prestabs"><button type="button" data-ptab="axo" class="${tab === 'axo' ? 'on' : ''}">${icon('axo', 14)} Aksonometri</button><button type="button" data-ptab="lokasi" class="${tab === 'lokasi' ? 'on' : ''}">${icon('map', 14)} Analisis lokasi</button></div>`;
+  const bindTabs = () => dlg.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { if (b.dataset.ptab !== tab) { tab = b.dataset.ptab; render(); } });
+  // unduh SVG → PNG (skala 2,5–3×) sebagai berkas lokal
+  const unduhPNG = async (svg, nama, btn, sc = 3) => {
+    const t0 = btn.textContent; btn.disabled = true; btn.textContent = 'Menyiapkan PNG…';
+    try {
+      const mW = +(svg.match(/width="(\d+)"/)?.[1] || 900), mH = +(svg.match(/height="(\d+)"/)?.[1] || 700);
+      const im = new Image();
+      await new Promise((res, rej) => { im.onload = res; im.onerror = () => rej(new Error('SVG gagal dimuat')); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+      const cv = document.createElement('canvas'); cv.width = Math.round(mW * sc); cv.height = Math.round(mH * sc);
+      const c = cv.getContext('2d'); c.scale(sc, sc); c.drawImage(im, 0, 0);
+      const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
+      const url = URL.createObjectURL(blob), el = document.createElement('a');
+      el.href = url; el.download = nama; document.body.append(el); el.click(); el.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      btn.textContent = 'PNG terunduh ✓';
+    } catch (e2) { console.error('PNG', e2); btn.textContent = 'Gagal — coba lagi'; }
+    finally { setTimeout(() => { btn.disabled = false; btn.textContent = t0; }, 2200); }
+  };
   const render = () => {
+    if (tab === 'lokasi') return renderLokasi();
     const cos = axoCallouts(m, p, stat, cab);
     const rows = cos.map(c => {
       const key = `${p.tipe}:${c.id}`, ov = p.lbl[key] || {}, off = ov.on === 0;
+      const sisi = ov.sd === 'l' ? '◀' : ov.sd === 'r' ? '▶' : '↔';
       return `<div class="pxrow${off ? ' off' : ''}" data-key="${key}">
         <button type="button" class="icb" data-pxe title="${off ? 'Tampilkan' : 'Sembunyikan'} keterangan ini">${icon(off ? 'eyeoff' : 'eye', 13)}</button>
+        <button type="button" class="icb" data-pxd title="Sisi garis keterangan: otomatis → kiri → kanan">${sisi}</button>
         <span class="sw" style="background:${c.warna}"></span>
         <div class="pxin"><input data-pxt maxlength="60" value="${esc(ov.t ?? c.t)}" placeholder="Judul">
         <input data-pxs class="pxspec" maxlength="90" value="${esc(ov.s ?? c.spec)}" placeholder="Spesifikasi / keterangan"></div></div>`;
     }).join('');
     openDlg('Presentasi — aksonometri exploded',
-      `<div class="preswrap">
+      `${tabsBar()}
+      <div class="preswrap">
         <div class="presctl">
           <label for="pxT">Tipe aksonometri</label>
           <select id="pxT">${AXO_TIPE.map(([k, n]) => `<option value="${k}"${k === p.tipe ? ' selected' : ''}>${n}</option>`).join('')}</select>
@@ -961,6 +988,12 @@ export function dlgPres() {
         if (o2.on === 0) delete o2.on; else o2.on = 0;
         prune(); A.save(); render();
       };
+      row.querySelector('[data-pxd]').onclick = () => {   // sisi: otomatis → kiri → kanan → otomatis
+        touch(); const o2 = ov();
+        o2.sd = o2.sd === 'l' ? 'r' : o2.sd === 'r' ? undefined : 'l';
+        if (!o2.sd) delete o2.sd;
+        prune(); A.save(); render();
+      };
       row.querySelector('[data-pxt]').onchange = e => { touch(); const o2 = ov(), v = e.target.value.slice(0, 60); if (v && v !== def.t) o2.t = v; else delete o2.t; prune(); A.save(); refreshView(); };
       row.querySelector('[data-pxs]').onchange = e => { touch(); const o2 = ov(), v = e.target.value.slice(0, 90); if (v !== def.spec) o2.s = v; else delete o2.s; prune(); A.save(); refreshView(); };
     });
@@ -983,24 +1016,43 @@ export function dlgPres() {
       };
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
     };
-    $('#pxPng').onclick = async () => {
-      const btn = $('#pxPng'), t0 = btn.textContent; btn.disabled = true; btn.textContent = 'Menyiapkan PNG…';
-      try {
-        const svg = svgOf(false);
-        const mW = +(svg.match(/width="(\d+)"/)?.[1] || 900), mH = +(svg.match(/height="(\d+)"/)?.[1] || 700);
-        const im = new Image();
-        await new Promise((res, rej) => { im.onload = res; im.onerror = () => rej(new Error('SVG gagal dimuat')); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
-        const sc = 3, cv = document.createElement('canvas'); cv.width = mW * sc; cv.height = mH * sc;
-        const c = cv.getContext('2d'); c.scale(sc, sc); c.drawImage(im, 0, 0);
-        const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
-        const url = URL.createObjectURL(blob), el = document.createElement('a');
-        el.href = url; el.download = `Presentasi-${p.tipe}-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}.png`;
-        document.body.append(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
-        btn.textContent = 'PNG terunduh ✓';
-      } catch (e2) { console.error('PNG presentasi', e2); btn.textContent = 'Gagal — coba lagi'; }
-      finally { setTimeout(() => { btn.disabled = false; btn.textContent = t0; }, 2200); }
-    };
+    $('#pxPng').onclick = () => unduhPNG(svgOf(false), `Presentasi-${p.tipe}-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}.png`, $('#pxPng'), 3);
     $('#pxOk').onclick = () => dlg.close();
+    bindTabs();
+  };
+  // ---- tab analisis lokasi: titik Google Maps → data OSM/Open-Meteo → panel + bacaan walet ----
+  const renderLokasi = () => {
+    const lk = m.lokasi, ada = lk?.amb && Object.keys(lk.amb).length;
+    const panels = ada ? SITE.panelsLokasi(m, lk) : null, tS = ada ? SITE.teksLokasi(m, lk) : null;
+    openDlg('Presentasi — analisis lokasi',
+      `${tabsBar()}
+       <div class="lkbar"><input id="lkIn" value="${lk ? `${lk.la}, ${lk.lo}` : ''}" placeholder="Tempel link Google Maps atau koordinat — contoh: -6.2334, 106.8342"><button type="button" class="pl-btn pl-blue" id="lkGo">${ada ? 'Analisis ulang' : 'Analisis'}</button></div>
+       <p class="tip">Cara ambil titik: buka lokasi di <b>Google Maps</b> → klik kanan titiknya → klik koordinat (tersalin otomatis) → tempel di sini. Link pendek maps.app.goo.gl tidak memuat koordinat — buka dulu, lalu salin koordinat/link panjangnya. Data: jalan &amp; lahan © OpenStreetMap, angin 12 bulan &amp; elevasi Open-Meteo (gratis). Hasil tersimpan di desain &amp; ikut link.</p>
+       <p class="tip" id="lkStat" style="min-height:16px;font-weight:600"></p>
+       ${ada ? `<div class="lkgrid">${panels.map(pn => `<figure class="lkcard">${pn.svg}<figcaption>${pn.teks.map(x => `<span>• ${esc(x)}</span>`).join('')}</figcaption></figure>`).join('')}</div>
+       <div class="lksaran"><b>Kesimpulan untuk RBW</b>${tS.saran.map(x => `<span>• ${esc(x)}</span>`).join('')}</div>` : '<p class="tip" style="margin-top:10px">Belum ada data — tempel titik lokasi lalu klik <b>Analisis</b>. Lembar hasilnya juga tersedia di ekspor PDF.</p>'}`,
+      `${ada ? `<button type="button" class="pl-btn" id="lkTerap" title="Isi arah/kecepatan angin simulasi & lingkungan pengamatan dari data lokasi">Terapkan ke simulasi</button><button type="button" class="pl-btn" id="lkPng">Unduh PNG lembar</button>` : ''}<button type="button" class="pl-btn pl-primary" id="pxOk">Selesai</button>`, true);
+    bindTabs();
+    $('#pxOk').onclick = () => dlg.close();
+    $('#lkGo').onclick = async () => {
+      if (sibuk) return;
+      const st2 = $('#lkStat'), ti = SITE.parseTitik($('#lkIn').value);
+      if (!ti) { st2.textContent = 'Titik tidak terbaca — tempel koordinat "lat, lng" (klik kanan di Google Maps) atau link panjang Maps.'; return; }
+      sibuk = true; $('#lkGo').disabled = true;
+      try {
+        const sama = m.lokasi && Math.abs(m.lokasi.la - ti.la) < 1e-4 && Math.abs(m.lokasi.lo - ti.lo) < 1e-4;
+        const amb = await SITE.ambilData(ti.la, ti.lo, tx => { st2.textContent = `Titik ${ti.la}, ${ti.lo} — ${tx}`; }, sama ? m.lokasi.amb : null);
+        touch(); m.lokasi = { ...ti, amb }; A.save();
+        sibuk = false; render();
+        if (amb.gagal?.length) setTimeout(() => { const s3 = $('#lkStat'); if (s3) s3.textContent = `Sebagian data gagal diambil (${amb.gagal.join(', ')}) — klik "Analisis ulang" untuk melengkapi.`; });
+      } catch (e2) { console.error('lokasi', e2); st2.textContent = 'Gagal mengambil data (periksa koneksi internet) — coba lagi.'; sibuk = false; $('#lkGo').disabled = false; }
+    };
+    if (!ada) return;
+    $('#lkTerap').onclick = () => {
+      touch(); const ubah = SITE.terapkanLokasi(m, m.lokasi); A.save(); A.renderAll();
+      $('#lkStat').textContent = ubah.length ? 'Diterapkan → ' + ubah.join(' · ') : 'Tidak ada data yang bisa diterapkan.';
+    };
+    $('#lkPng').onclick = () => unduhPNG(SITE.lembarLokasiSVG(m, m.lokasi), `Analisis-lokasi-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}.png`, $('#lkPng'), 2.5);
   };
   render();
 }
@@ -1021,7 +1073,8 @@ export function dlgHelp() {
     ['🚶 Jalan di dalam', 'Di 3D tekan "Jalan di dalam": berjalan dengan WASD/panah, seret untuk menoleh, naiki tangga untuk pindah lantai, T = senter. Gelap-terangnya mengikuti simulasi lux; garis oranye = rantai tweeter tarik.'],
     ['🗺️ Foto satelit', 'Kartu "Lokasi (satelit)" di panel kanan: screenshot Google Maps (mode satelit) lokasi Anda, unggah, atur lebar & putar — gedung terlihat di lahan aslinya.'],
     ['💰 RAB', 'Tombol "RAB": tabel nama item, jumlah (otomatis dari desain), harga satuan (bisa diedit), total, keterangan; bisa tambah baris & salin ke Excel/WA.'],
-    ['🖼️ Presentasi', 'Tombol "Presentasi": aksonometri exploded ala diagram arsitek — pilih tipe (lengkap per lantai / interior / eksterior / breakdown item), gaya warna, jarak antar lapisan. Tiap bagian diberi garis keterangan (nama + spesifikasi) yang teksnya bisa diedit, disembunyikan, dan digeser; hasilnya bisa diunduh PNG HD atau ikut PDF.'],
+    ['🖼️ Presentasi', 'Tombol "Presentasi": aksonometri exploded ala diagram arsitek — pilih tipe (lengkap per lantai / interior / eksterior / breakdown item), gaya warna, jarak antar lapisan; item digambar detail (papan sirip sesuai jaraknya, corong tweeter sesuai arah, kusen LMB, sarang, kolam, tangga). Tiap bagian diberi garis keterangan yang teksnya BISA DIEDIT, disembunyikan, dipindah sisi kiri/kanan (tombol ↔), dan digeser naik-turun; hasil bisa diunduh PNG HD atau ikut PDF.'],
+    ['📍 Analisis lokasi', 'Di dialog Presentasi, tab "Analisis lokasi": tempel titik/link Google Maps → panel jalan & kebisingan, jalur matahari, mawar angin 12 bulan, topografi, ekologi radius 1 km (data OpenStreetMap + Open-Meteo, gratis) + kesimpulan untuk RBW. Tombol "Terapkan ke simulasi" mengisi arah/kecepatan angin & lingkungan pengamatan; lembarnya bisa diunduh PNG atau ikut PDF.'],
     ['⭐ Skor & tanda lokasi', 'Klik catatan analisis yang bergaris bawah — lantainya dibuka dan lokasinya ditandai kotak merah berkedip.'],
     ['📤 Selesai & konsultasi', 'Kirim desain + link ke WhatsApp tim GedungWalet.com. Seluruh desain (termasuk channel, RAB, pengaturan simulasi) tersimpan di link.'],
   ];

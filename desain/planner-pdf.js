@@ -15,6 +15,7 @@ import { analyze } from './planner-analysis.js';
 import { makeSheetCanvas, pagesPDF } from './planner-export.js';
 import { audioElevSVG, defaultLayout, AMPLI_KEYS } from './planner-audio2d.js';
 import { axoSVG, AXO_TIPE, AXO_PALET, AXO_DEFAULT } from './planner-axo.js';
+import { lembarLokasiSVG, teksLokasi } from './planner-site.js';
 
 export const LEMBAR = [
   ['tarik', 'Denah suara tarik (tweeter & kabel)'],
@@ -30,6 +31,7 @@ export const LEMBAR = [
   ['db', 'Denah suara dB per ruang'],
   ['lengkap', 'Denah lengkap gabungan + 3D'],
   ['presentasi', 'Aksonometri presentasi (exploded)'],
+  ['lokasi', 'Analisis lokasi (site analysis)'],
   ['analisis', 'Analisis kelayakan'],
   ['rab', 'RAB perlengkapan'],
 ];
@@ -155,6 +157,7 @@ export async function buildPDF(m, keys, img3d, prog = () => {}) {
     try {
     if (k === 'lengkap') { cvs.push(await makeSheetCanvas(m, a, img3d)); continue; }
     if (k === 'presentasi') { cvs.push(await presPage(m, a, cab, no, total)); continue; }
+    if (k === 'lokasi') { cvs.push(await lokasiPage(m, no, total)); continue; }
     if (k === 'analisis') { cvs.push(analisisPage(m, a, no, total)); continue; }
     if (k === 'rab') { rabPages(m, a, cab, no, total).forEach(cv => cvs.push(cv)); continue; }
     if (k === 'audio') { cvs.push(await audioPage(m, a, cab, chs, no, total)); continue; }
@@ -404,6 +407,34 @@ async function presPage(m, a, cab, no, total) {
     ],
     legend: [],
     foot: 'Gambar presentasi (indikatif) untuk menjelaskan desain — bukan gambar kerja. Ukuran & jumlah mengikuti desain pada saat PDF dibuat.',
+  });
+  return cv;
+}
+
+// Lembar analisis lokasi: panel-panel site analysis dari data yang tersimpan di m.lokasi
+// (jalan/kebisingan, jalur matahari, angin, topografi, ekologi + kesimpulan RBW).
+async function lokasiPage(m, no, total) {
+  const { cv, c } = page('Lembar analisis lokasi (site analysis)', m, no, total);
+  if (!(m.lokasi?.amb && Object.keys(m.lokasi.amb).length)) {
+    c.font = `15px ${FONT}`; c.fillStyle = '#5a6472';
+    c.fillText('Belum ada data lokasi. Buka tombol "Presentasi" → tab "Analisis lokasi", tempel titik Google Maps,', MG, 150);
+    c.fillText('klik "Analisis", lalu buat PDF lagi — lembar ini akan terisi panel jalan, matahari, angin, topografi & ekologi.', MG, 174);
+    return cv;
+  }
+  const svg = lembarLokasiSVG(m, m.lokasi);
+  const im = await loadImg(svgUrl(svg));
+  const areaW = PW - 2 * MG - RIGHT - 40, areaH = PH - 160;
+  const sc = Math.min(areaW / im.width, areaH / im.height);
+  c.drawImage(im, MG, 124 + (areaH - im.height * sc) / 2, im.width * sc, im.height * sc);
+  const t = teksLokasi(m, m.lokasi);
+  rightCol(c, {
+    desc: [
+      `Titik lokasi ${m.lokasi.la}, ${m.lokasi.lo} (dari Google Maps). Data lingkungan: jalan & tutupan lahan © OpenStreetMap, angin 12 bulan & elevasi Open-Meteo.`,
+      ...t.jalan.slice(0, 1), ...t.angin.slice(0, 1), ...t.topo.slice(0, 1), ...t.eko.slice(0, 2),
+    ],
+    stats: [],
+    legend: [],
+    foot: 'Analisis lokasi = perkiraan dari data peta terbuka; kondisi lapangan (populasi walet, bising sesaat, banjir) tetap perlu dicek langsung. ' + (t.saran.length ? 'Kesimpulan: ' + t.saran.join(' ') : ''),
   });
   return cv;
 }
