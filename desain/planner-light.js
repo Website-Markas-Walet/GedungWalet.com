@@ -5,8 +5,8 @@
 // dari tiap ruang ke ruang yang lebih terang sampai LMB = arah yang dicari anakan walet saat belajar terbang keluar.
 // Model: cahaya langsung tiap bukaan (sumber bidang Lambert, 3D sederhana) + pantulan rata per ruang (fluks terbagi),
 // dihitung berulang sampai stabil. Perkiraan orde besaran — bukan pengganti lux meter.
-import { RULES, SIM_DEFAULT } from './planner-data.js?v=20260930b';
-import { floorHt, floorRect, spaces, levels } from './planner-geom.js?v=20260930b';
+import { RULES, SIM_DEFAULT } from './planner-data.js?v=20260930d';
+import { floorHt, floorRect, spaces, levels } from './planner-geom.js?v=20260930d';
 
 const RHO = { lantai: 0.2, dinding: 0.3, dindingVoid: 0.2, plafon: 0.25, plafonInap: 0.08 };   // pantulan permukaan (asumsi)
 const TAU_LMB = 0.6;                 // kusen, kawat & bayangan LMB

@@ -2,20 +2,20 @@
 // inap, sirip, tata ruang, ruang audio, void, pencahayaan, kenyamanan, inap vs jalur, ventilasi, dB, gabungan) +
 // penjelasan rinci & legenda, lalu lembar analisis kelayakan dan lembar RAB. Lembar yang diekspor dipilih lewat
 // centang di dialog "Ekspor PDF".
-import { TYPES, RULES, SUARA, AMPLI, AUDIO_ALAT, dbTarget, SARANG_JENIS, SARANG_WARNA } from './planner-data.js?v=20260930b';
-import { levels, floorRect, floorHt, center, isLar } from './planner-geom.js?v=20260930b';
-import { floorSVG, symbolSVG } from './planner-draw.js?v=20260930b';
-import { simulate, heatURL, luxTxt, simOf, arahNama, LUX_STOPS, luxColor } from './planner-light.js?v=20260930b';
-import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930b';
-import { comfort, TINGKAT } from './planner-comfort.js?v=20260930b';
-import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930b';
-import { rabRows } from './planner-rab.js?v=20260930b';
-import { climate, simulateAir } from './planner-air.js?v=20260930b';
-import { analyze } from './planner-analysis.js?v=20260930b';
-import { makeSheetCanvas, pagesPDF } from './planner-export.js?v=20260930b';
-import { audioElevSVG, defaultLayout, AMPLI_KEYS } from './planner-audio2d.js?v=20260930b';
-import { axoSVG, AXO_TIPE, AXO_PALET, AXO_DEFAULT } from './planner-axo.js?v=20260930b';
-import { lembarLokasiSVG, teksLokasi } from './planner-site.js?v=20260930b';
+import { TYPES, RULES, SUARA, AMPLI, AUDIO_ALAT, dbTarget, SARANG_JENIS, SARANG_WARNA } from './planner-data.js?v=20260930d';
+import { levels, floorRect, floorHt, center, isLar } from './planner-geom.js?v=20260930d';
+import { floorSVG, symbolSVG } from './planner-draw.js?v=20260930d';
+import { simulate, heatURL, luxTxt, simOf, arahNama, LUX_STOPS, luxColor } from './planner-light.js?v=20260930d';
+import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930d';
+import { comfort, TINGKAT } from './planner-comfort.js?v=20260930d';
+import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930d';
+import { rabRows } from './planner-rab.js?v=20260930d';
+import { climate, simulateAir } from './planner-air.js?v=20260930d';
+import { analyze } from './planner-analysis.js?v=20260930d';
+import { makeSheetCanvas, pagesPDF } from './planner-export.js?v=20260930d';
+import { audioElevSVG, defaultLayout, AMPLI_KEYS } from './planner-audio2d.js?v=20260930d';
+import { axoSVG, AXO_TIPE, AXO_PALET, AXO_DEFAULT } from './planner-axo.js?v=20260930d';
+import { lembarLokasiSVG, teksLokasi, hitung as hitungLokasi } from './planner-site.js?v=20260930d';
 
 export const LEMBAR = [
   ['tarik', 'Denah suara tarik (tweeter & kabel)'],
@@ -157,7 +157,7 @@ export async function buildPDF(m, keys, img3d, prog = () => {}) {
     try {
     if (k === 'lengkap') { cvs.push(await makeSheetCanvas(m, a, img3d)); continue; }
     if (k === 'presentasi') { cvs.push(await presPage(m, a, cab, no, total)); continue; }
-    if (k === 'lokasi') { cvs.push(await lokasiPage(m, no, total)); continue; }
+    if (k === 'lokasi') { (await lokasiPage(m, no, total)).forEach(cv => cvs.push(cv)); continue; }
     if (k === 'analisis') { cvs.push(analisisPage(m, a, no, total)); continue; }
     if (k === 'rab') { rabPages(m, a, cab, no, total).forEach(cv => cvs.push(cv)); continue; }
     if (k === 'audio') { cvs.push(await audioPage(m, a, cab, chs, no, total)); continue; }
@@ -411,32 +411,39 @@ async function presPage(m, a, cab, no, total) {
   return cv;
 }
 
-// Lembar analisis lokasi: panel-panel site analysis dari data yang tersimpan di m.lokasi
-// (jalan/kebisingan, jalur matahari, angin, topografi, ekologi + kesimpulan RBW).
+// Lembar analisis lokasi (2 halaman): halaman 1 = panel lokasi, bangunan, jalan/bising, matahari, angin, air & hujan;
+// halaman 2 = topografi, suhu & kelembapan, ekologi, sumber bising, kendala & peluang, skor — plus implikasi untuk desain.
 async function lokasiPage(m, no, total) {
-  const { cv, c } = page('Lembar analisis lokasi (site analysis)', m, no, total);
   if (!(m.lokasi?.amb && Object.keys(m.lokasi.amb).length)) {
+    const { cv, c } = page('Lembar analisis lokasi (site analysis)', m, no, total);
     c.font = `15px ${FONT}`; c.fillStyle = '#5a6472';
     c.fillText('Belum ada data lokasi. Buka tombol "Presentasi" → tab "Analisis lokasi", tempel titik Google Maps,', MG, 150);
-    c.fillText('klik "Analisis", lalu buat PDF lagi — lembar ini akan terisi panel jalan, matahari, angin, topografi & ekologi.', MG, 174);
-    return cv;
+    c.fillText('klik "Analisis", lalu buat PDF lagi — lembar ini akan terisi 12 panel: lokasi, bangunan, jalan, matahari, angin, hujan, topografi, iklim, ekologi, dll.', MG, 174);
+    return [cv];
   }
-  const svg = lembarLokasiSVG(m, m.lokasi);
-  const im = await loadImg(svgUrl(svg));
-  const areaW = PW - 2 * MG - RIGHT - 40, areaH = PH - 160;
-  const sc = Math.min(areaW / im.width, areaH / im.height);
-  c.drawImage(im, MG, 124 + (areaH - im.height * sc) / 2, im.width * sc, im.height * sc);
-  const t = teksLokasi(m, m.lokasi);
-  rightCol(c, {
-    desc: [
-      `Titik lokasi ${m.lokasi.la}, ${m.lokasi.lo} (dari Google Maps). Data lingkungan: jalan & tutupan lahan © OpenStreetMap, angin 12 bulan & elevasi Open-Meteo.`,
-      ...t.jalan.slice(0, 1), ...t.angin.slice(0, 1), ...t.topo.slice(0, 1), ...t.eko.slice(0, 2),
-    ],
-    stats: [],
-    legend: [],
-    foot: 'Analisis lokasi = perkiraan dari data peta terbuka; kondisi lapangan (populasi walet, bising sesaat, banjir) tetap perlu dicek langsung. ' + (t.saran.length ? 'Kesimpulan: ' + t.saran.join(' ') : ''),
-  });
-  return cv;
+  const lk = m.lokasi, H = hitungLokasi(m, lk), t = teksLokasi(m, lk, H), out = [];
+  const S = H.skor, ada = (v, f) => (v == null ? null : f(v));
+  for (const bagian of [1, 2]) {
+    const { cv, c } = page(`Lembar analisis lokasi (${bagian}/2)`, m, no, total);
+    const im = await loadImg(svgUrl(lembarLokasiSVG(m, lk, bagian)));
+    const areaW = PW - 2 * MG - RIGHT - 40, areaH = PH - 160, sc = Math.min(areaW / im.width, areaH / im.height);
+    c.drawImage(im, MG, 124 + (areaH - im.height * sc) / 2, im.width * sc, im.height * sc);
+    if (bagian === 1) {
+      rightCol(c, {
+        desc: [`Titik ${lk.la}, ${lk.lo} (dari Google Maps). Jalan, bangunan, lahan & fasilitas © OpenStreetMap; angin, suhu, kelembapan, hujan & elevasi Open-Meteo.`, ...t.lokasi.slice(0, 1), ...t.bangunan.slice(0, 1), ...t.jalan.slice(0, 1), ...t.matahari.slice(1, 2), ...t.angin.slice(0, 2), ...t.air.slice(0, 1)],
+        stats: [S.total != null && ['Skor kelayakan lokasi', `${S.total}/100 — ${S.label}`], H.bising && ['Perkiraan bising', `±${H.bising.db} dB(A) · ${H.bising.tingkat.toLowerCase()}`], H.iklim && ['Curah hujan', `${fmt(Math.round(H.iklim.thn))} mm/th · tipe ${H.iklim.tipe[0]}`], H.angin && ['Angin dominan', `${H.angin.nm} · ${String(Math.round(H.angin.ws * 10) / 10).replace('.', ',')} m/s`], H.bangun && ['Tutupan bangunan', `±${H.bangun.p}% · ${H.bangun.kelas}`]].filter(Boolean),
+        legend: [], foot: 'Analisis lokasi = perkiraan dari data peta & cuaca terbuka; kondisi lapangan tetap perlu dicek langsung. Bersambung ke halaman berikutnya.',
+      });
+    } else {
+      rightCol(c, {
+        desc: [...(t.topo.slice(0, 1)), ...(t.iklim.slice(0, 1)), ...(t.eko.slice(0, 1)), ...t.implikasi.slice(0, 7)],
+        stats: [H.topo && ['Kemiringan lahan', `±${String(Math.round(H.topo.persen * 10) / 10).replace('.', ',')}% · ${H.topo.kelas}`], H.air && ['Risiko genangan', H.air.tingkat], H.eko && ['Indeks pakan serangga', `${H.eko.pakan}/100 (data ${H.eko.confNm})`], S.total != null && ['Skor kelayakan lokasi', `${S.total}/100`]].filter(Boolean),
+        legend: [], foot: 'dB(A) & skor = perkiraan dengan asumsi (bobot faktor & sumber bising per kelas jalan); OSM belum lengkap di semua wilayah; iklim = reanalisis ERA5 ±10 km. Bukan pengganti survei lapangan.',
+      });
+    }
+    out.push(cv);
+  }
+  return out;
 }
 
 async function audioPage(m, a, cab, chs, no, total) {

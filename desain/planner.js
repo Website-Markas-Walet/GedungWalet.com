@@ -1,18 +1,18 @@
 // Walet Planner — editor denah rumah walet (2D + 3D): state, interaksi, panel properti & analisis.
-import { CATALOG, TYPES, RULES, TARIK_ROLES, TW, LAR_FUNGSI, ARAH8, LANGIT, SISI, SARANG_JENIS, icon } from './planner-data.js?v=20260930b';
-import { climate } from './planner-air.js?v=20260930b';
-import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930b';
-import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930b';
-import * as SND from './planner-suara.js?v=20260930b';
-import { derive, snapToWall, snapHexa, isLar, center, inRect, twinapRekomendasi, zonePattern, siripDetail, siripVolume, pushOffWalls, snap90, dist, distToRect, angDiff, floorRect, floorHt, clampInto, isFull, ovArea, levels } from './planner-geom.js?v=20260930b';
-import { drawFloor, symbolSVG } from './planner-draw.js?v=20260930b';
-import { generate } from './planner-auto.js?v=20260930b';
-import { analyze } from './planner-analysis.js?v=20260930b';
-import { simulate, heatURL, luxColor, luxTxt, kategori, LUX_STOPS, simOf, arahNama, facadeAz } from './planner-light.js?v=20260930b';
-import { simulateAir, suhuLuar } from './planner-air.js?v=20260930b';
-import { comfort, TINGKAT } from './planner-comfort.js?v=20260930b';
-import * as D from './planner-dialogs.js?v=20260930b';
-import * as SK from './planner-sketch.js?v=20260930b';
+import { CATALOG, TYPES, RULES, TARIK_ROLES, TW, LAR_FUNGSI, ARAH8, LANGIT, SISI, SARANG_JENIS, icon } from './planner-data.js?v=20260930d';
+import { climate } from './planner-air.js?v=20260930d';
+import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930d';
+import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930d';
+import * as SND from './planner-suara.js?v=20260930d';
+import { derive, snapToWall, snapHexa, isLar, center, inRect, twinapRekomendasi, zonePattern, siripDetail, siripVolume, pushOffWalls, snap90, dist, distToRect, angDiff, floorRect, floorHt, clampInto, isFull, ovArea, levels } from './planner-geom.js?v=20260930d';
+import { drawFloor, symbolSVG } from './planner-draw.js?v=20260930d';
+import { generate } from './planner-auto.js?v=20260930d';
+import { analyze } from './planner-analysis.js?v=20260930d';
+import { simulate, heatURL, luxColor, luxTxt, kategori, LUX_STOPS, simOf, arahNama, facadeAz } from './planner-light.js?v=20260930d';
+import { simulateAir, suhuLuar } from './planner-air.js?v=20260930d';
+import { comfort, TINGKAT } from './planner-comfort.js?v=20260930d';
+import * as D from './planner-dialogs.js?v=20260930d';
+import * as SK from './planner-sketch.js?v=20260930d';
 
 const $ = s => document.querySelector(s);
 const LS_KEY = 'waletPlanner.v2';
@@ -210,7 +210,7 @@ const app = {
     if (!on && !isFull(model, t)) { delete t.fx; delete t.fy; delete t.fw; delete t.fh; }
   },
   async load3D() {   // janji tunggal — dua pemanggil beriringan tidak boleh me-mount dua kali
-    if (!threeP) threeP = import('./planner-3d.js?v=20260930b').then(t => { t.mount($('#view3d')); return (three = t); });
+    if (!threeP) threeP = import('./planner-3d.js?v=20260930d').then(t => { t.mount($('#view3d')); return (three = t); });
     return threeP;
   },
   mulaiJalur,
@@ -1174,12 +1174,15 @@ function airCard() {
     <div class="row"><span class="k">Kelembapan dalam (%)</span><input type="number" step="1" min="50" max="99" data-p="smRh" value="${S.rh}"></div>
     ${rowSel('Angin datang dari', 'smAngin', SISI, S.anginDari)}
     <div class="row"><span class="k">Kecepatan angin (m/s)</span><input type="number" step="0.5" min="0" max="15" data-p="smKec" value="${S.anginKec}"></div>
+    <div class="row"><span class="k">Suhu luar rata-rata (°C)</span><input type="number" step="0.5" min="15" max="35" data-p="smTluar" value="${S.tluar}"></div>
+    <div class="row"><span class="k">Kelembapan luar (%)</span><input type="number" step="1" min="30" max="100" data-p="smRhl" value="${S.rhl}"></div>
     ${rowInfo(`Suhu luar pukul ${jamTxt(+S.jam)}`, `±${A.Tout.toFixed(1).replace('.', ',')} °C`)}
     ${rowInfo('Udara masuk / keluar', `${q(A.intake)} / ${q(A.outtake)} m³/jam`)}
     ${rowInfo('Ventilasi', `${A.masuk.vent} masuk · ${A.keluar.vent} keluar`)}
     ${rowInfo('LMB', `${A.masuk.lmb} masuk · ${A.keluar.lmb} keluar`)}
     <p class="tip">${benar ? '<span class="ok">Saat ini: ventilasi = intake, LMB = outtake ✓</span>' : `<span class="warn">Saat ini terbalik: udara masuk lewat LMB, keluar lewat ventilasi</span> — ${A.Tout > A.Tin ? 'udara luar lebih panas dari dalam (siang terik)' : 'LMB ditekan angin'}.`}</p>
     <table class="luxt">${rows}</table>
+    <p class="tip">Suhu &amp; kelembapan LUAR bawaan 29 °C &amp; 75%; untuk lokasi Anda, isi otomatis lewat Presentasi → Analisis lokasi → "Terapkan ke simulasi".</p>
     <p class="tip">Model jaringan aliran multizona seperti CONTAM (NIST) / EnergyPlus AirflowNetwork: tiap ruang = satu zona, tiap bukaan = orifis Q = Cd·A·√(2ΔP/ρ), digerakkan efek cerobong dan tekanan angin. Udara RBW yang hangat & lembap lebih ringan → naik dan keluar lewat bukaan tinggi (LMB / menara), udara segar masuk lewat ventilasi yang rendah. Jadi ventilasi = intake & LMB = outtake benar saat udara dalam lebih hangat dari luar (sore–malam–pagi); saat siang terik atau LMB dihantam angin arahnya bisa terbalik. Merah = pertukaran udara &lt; 0,5×/jam (pengap). Perkiraan kasar.</p></div>`;
 }
 function bindAirCard() {
@@ -1189,6 +1192,8 @@ function bindAirCard() {
   p('smRh').onchange = e => setSim({ rh: clamp(+e.target.value || 85, 50, 99) });
   p('smAngin').onchange = e => setSim({ anginDari: e.target.value });
   p('smKec').onchange = e => setSim({ anginKec: clamp(+e.target.value || 0, 0, 15) });
+  p('smTluar').onchange = e => setSim({ tluar: clamp(+e.target.value || 29, 15, 35) });
+  p('smRhl').onchange = e => setSim({ rhl: clamp(+e.target.value || 75, 30, 100) });
 }
 // Suhu & kelembapan per lantai + dinding yang panas kena matahari (mode "Cek udara").
 function iklimCard() {

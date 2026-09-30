@@ -405,3 +405,9 @@ body.pl-lock .pl #dlg{visibility:visible}
 /* tab render realistis */
 .pl-dlg label.chk2{display:flex;align-items:center;gap:8px;font-weight:500;margin-top:8px}
 .pl-dlg label.chk2 input{width:auto}
+
+/* kotak buku panduan di dialog bantuan */
+.pl-dlg .pl-buku{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 12px;padding:12px 14px;border:1px solid #cfe0f5;border-radius:10px;background:#eef5fd}
+.pl-dlg .pl-buku b{flex:0 0 100%;font-family:Raleway,sans-serif;color:var(--brand-dark,#0d47a1)}
+.pl-dlg .pl-buku span{flex:1 1 220px;font-size:13.5px;color:var(--muted)}
+.pl-dlg .pl-buku a.pl-btn{text-decoration:none;display:inline-flex;align-items:center}

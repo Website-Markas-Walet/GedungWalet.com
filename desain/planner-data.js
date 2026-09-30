@@ -5,7 +5,7 @@
 export const WA_NUMBER = '6285235350662';
 export const TW = 0.16;   // ukuran tapak simbol tweeter di denah (m)
 // Pengaturan simulasi cahaya & udara (disimpan di model.sim). hadap = arah kompas sisi depan gedung (°, 0 = utara).
-export const SIM_DEFAULT = { hadap: 0, jam: 13, bulan: 0, langit: 'berawan', lintang: -6, suhu: 28, rh: 85, anginDari: 'depan', anginKec: 2, walet: 20 };
+export const SIM_DEFAULT = { hadap: 0, jam: 13, bulan: 0, langit: 'berawan', lintang: -6, suhu: 28, rh: 85, anginDari: 'depan', anginKec: 2, walet: 20, tluar: 29, tamp: 4, rhl: 75 };
 export const ARAH8 = [[0, 'Utara'], [45, 'Timur laut'], [90, 'Timur'], [135, 'Tenggara'], [180, 'Selatan'], [225, 'Barat daya'], [270, 'Barat'], [315, 'Barat laut']];
 export const LANGIT = [['cerah', 'Cerah'], ['berawan', 'Berawan'], ['mendung', 'Mendung']];
 export const SISI = [['depan', 'Depan'], ['kanan', 'Kanan'], ['belakang', 'Belakang'], ['kiri', 'Kiri']];
@@ -209,6 +209,7 @@ export const ICONS = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
   axo: '<path d="M12 2l8 4.6v4.8l-8 4.6-8-4.6V6.6z"/><path d="M12 7.2 20 11.4M12 7.2 4 11.4M12 7.2V16"/><path d="M4 15.4l8 4.6 8-4.6" stroke-dasharray="2.5 2.5"/>',
   video: '<rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 11l6-3.5v9L15 13"/>',
+  book: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6M9 10.5h6"/>',
 };
 
 export function icon(name, size = 18) {

@@ -3,8 +3,8 @@
 // grid dengan langkah 4 arah, boleh menembus sekat TERPAL tapi tidak sekat BATA / dinding luar; antar lantai lewat jalur
 // tegak (riser) di dekat ruang audio. Hasil: panjang kabel per channel + total, jumlah klem (tiap 10 cm), dan polyline
 // untuk digambar di denah. Kabel hexagonal otomatis menghitung tinggi gedung + menara sampai atap.
-import { RULES, dbTarget, dbMid } from './planner-data.js?v=20260930b';
-import { levels, floorRect, floorHt, center } from './planner-geom.js?v=20260930b';
+import { RULES, dbTarget, dbMid } from './planner-data.js?v=20260930d';
+import { levels, floorRect, floorHt, center } from './planner-geom.js?v=20260930d';
 
 export const KABEL_WARNA = ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA', '#00ACC1', '#F06292', '#7CB342', '#5E35B1', '#F9A825', '#26A69A', '#D81B60'];
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
