@@ -2,8 +2,8 @@
 // Tiap lantai boleh beda ukuran/posisi: void diletakkan di area yang dimiliki SEMUA lantai supaya terjun lurus, lalu tiap
 // lantai ditata di sekelilingnya: ruang void bersekat (LAR void) → ruang jalur → LAR inap → ruang inap bersirip.
 // Tweeter tarik berantai LMB → LAR void → jalur → LAR inap → inap; tweeter inap menghadap LAR.
-import { RULES, SURVEY_DEFAULT, TW } from './planner-data.js?v=20260930';
-import { ovArea, floorRect, floorHt, intersect, twinapPattern, snapHexa } from './planner-geom.js?v=20260930';
+import { RULES, SURVEY_DEFAULT, TW } from './planner-data.js?v=20260930b';
+import { ovArea, floorRect, floorHt, intersect, twinapPattern, snapHexa } from './planner-geom.js?v=20260930b';
 
 const r2 = v => Math.round(v * 100) / 100;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));

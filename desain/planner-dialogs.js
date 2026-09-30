@@ -1,16 +1,16 @@
 // Dialog Walet Planner: pilihan awal (manual / pengamatan cepat), pengaturan proyek, tanya-jawab pengamatan,
 // selesai & kirim WhatsApp, link desain, dan lembar desain untuk admin.
-import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930';
-import { floorSVG } from './planner-draw.js?v=20260930';
-import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930';
-import { luxTxt } from './planner-light.js?v=20260930';
-import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930';
-import { rabRows } from './planner-rab.js?v=20260930';
-import * as SK from './planner-sketch.js?v=20260930';
-import * as SND from './planner-suara.js?v=20260930';
-import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930';
-import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930';
-import * as SITE from './planner-site.js?v=20260930';
+import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930b';
+import { floorSVG } from './planner-draw.js?v=20260930b';
+import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930b';
+import { luxTxt } from './planner-light.js?v=20260930b';
+import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930b';
+import { rabRows } from './planner-rab.js?v=20260930b';
+import * as SK from './planner-sketch.js?v=20260930b';
+import * as SND from './planner-suara.js?v=20260930b';
+import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930b';
+import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930b';
+import * as SITE from './planner-site.js?v=20260930b';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -200,7 +200,7 @@ export function dlgFinish() {
 
 // ---------- ekspor PDF multi-lembar (centang lembar yang diikutkan) ----------
 export async function dlgPDF() {
-  const { LEMBAR } = await import('./planner-pdf.js?v=20260930');
+  const { LEMBAR } = await import('./planner-pdf.js?v=20260930b');
   openDlg('Ekspor PDF — pilih lembar',
     `<p class="lead">Setiap lembar berisi gambaran semua lantai untuk satu tema, lengkap dengan penjelasan & legenda. Centang yang mau diikutkan ke PDF.</p>
      <div class="pdfl">${LEMBAR.map(([k, nm]) => `<label class="chk"><input type="checkbox" data-pk="${k}" checked> ${nm}</label>`).join('')}</div>
@@ -217,7 +217,7 @@ export async function dlgPDF() {
     try {
       const m = A.model;
       const img3d = keys.includes('lengkap') ? (await A.load3D()).snapshotSheet(m, 1280, 960) : null;
-      const { buildPDF } = await import('./planner-pdf.js?v=20260930');
+      const { buildPDF } = await import('./planner-pdf.js?v=20260930b');
       const blob = await buildPDF(m, keys, img3d, t => { btn.textContent = t; });
       const url = URL.createObjectURL(blob), el = document.createElement('a');
       el.href = url; el.download = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${keys.length}lembar.pdf`;
@@ -234,7 +234,7 @@ export async function downloadPDF(btn) {
   const t0 = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = 'Menyiapkan PDF…'; }
   try {
     const m = A.model, three = await A.load3D(), img3d = three.snapshotSheet(m, 1280, 960);
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930b');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const url = URL.createObjectURL(canvasPDF(cv));
     const el = document.createElement('a');
@@ -346,13 +346,14 @@ export function buildShareLink(m) {
   const tb = m.siripTebal || RULES.siripTebalCm, lb = m.siripLebar || RULES.siripLebarCm, pj = +m.papanPjg || RULES.papanPanjang;
   const adaRab = m.rab && (Object.keys(m.rab.h || {}).length || Object.keys(m.rab.k || {}).length || (m.rab.x || []).length);
   const px = m.pres && typeof m.pres === 'object' ? m.pres : null;   // pengaturan presentasi ikut link bila bukan bawaan
-  const adaPx = px && (px.tipe !== AXO_DEFAULT.tipe || px.palet !== AXO_DEFAULT.palet || +px.gap !== AXO_DEFAULT.gap || !px.garis || !px.ket || Object.keys(px.lbl || {}).length);
+  const adaPx = px && (px.tipe !== AXO_DEFAULT.tipe || px.palet !== AXO_DEFAULT.palet || (px.gap != null && +px.gap !== AXO_DEFAULT.gap) || px.garis === 0 || px.ket === 0 || Object.keys(px.lbl || {}).length || px.jalur?.length >= 2 || px.rKec || px.rTgg);
   const slim = { v: 6, n: m.name, o: m.owner, c: m.city, w: m.w, h: m.h, fh: m.floorH, k: m.kolom, st: m.showStruktur === false ? 0 : 1, s: m.survey || null, f: floors,
     ...(m.menara ? { mn: encF(m.menara) } : {}), ...(m.sim && Object.keys(m.sim).length ? { sm: m.sim } : {}),
     ...(m.audio ? { au: m.audio } : {}),
     ...(m.kabel?.ch?.length || m.kabel?.rute ? { kb: { ...(m.kabel.ch?.length ? { ch: m.kabel.ch } : {}), ...(m.kabel.rute && Object.keys(m.kabel.rute).length ? { r: m.kabel.rute } : {}) } } : {}),
     ...(adaRab ? { rb: m.rab } : {}),
-    ...(adaPx ? { px: { t: px.tipe, p: px.palet, g: px.gap, r: px.garis ? 1 : 0, k: px.ket ? 1 : 0, ...(Object.keys(px.lbl || {}).length ? { l: px.lbl } : {}) } } : {}),
+    ...(adaPx ? { px: { t: px.tipe, p: px.palet, g: px.gap, r: px.garis ? 1 : 0, k: px.ket ? 1 : 0, ...(Object.keys(px.lbl || {}).length ? { l: px.lbl } : {}),
+      ...(px.jalur?.length >= 2 ? { j: px.jalur } : {}), ...(px.rKec ? { rk: px.rKec } : {}), ...(px.rTgg ? { rt: px.rTgg } : {}) } } : {}),
     ...(m.lokasi && Number.isFinite(+m.lokasi.la) ? { lk: m.lokasi } : {}),
     ...(tb !== RULES.siripTebalCm || lb !== RULES.siripLebarCm || pj !== RULES.papanPanjang ? { sp: [tb, lb, pj] } : {}) };
   const json = JSON.stringify(slim);
@@ -481,6 +482,12 @@ export function parseShare(hash) {
         if (v.dy != null) o2.dy = num(v.dy, -600, 600, 0);
         if (Object.keys(o2).length) p.lbl[k] = o2;
       });
+      if (Array.isArray(s.px.j)) {   // jalur kamera render realistis
+        const j = s.px.j.slice(0, 40).map(q => (q && typeof q === 'object' ? { x: num(q.x, -12, W + 12), y: num(q.y, -12, H + 12), f: Math.round(num(q.f, 0, 9, 0)) } : null)).filter(Boolean);
+        if (j.length >= 2) p.jalur = j;
+      }
+      if (s.px.rk != null) p.rKec = num(s.px.rk, 0.6, 3, 1.2);
+      if (s.px.rt != null) p.rTgg = num(s.px.rt, 1.2, 2.2, 1.6);
       model.pres = p;
     }
     if (s.lk) { const lk = SITE.bersihkanLokasi(s.lk); if (lk) model.lokasi = lk; }   // analisis lokasi (ringkasan kecil)
@@ -910,11 +917,11 @@ export function dlgRAB() {
 // ---------- presentasi: aksonometri exploded (grafik arsitek) ----------
 // Halaman rendering ala diagram arsitek: lantai/lapisan ditarik ke atas, tiap bagian diberi garis
 // keterangan (nama + spesifikasi) yang teksnya bisa diedit, disembunyikan, dan digeser naik-turun.
-export function dlgPres() {
+export function dlgPres(tabAwal) {
   const m = A.model;
   const p = m.pres = { ...AXO_DEFAULT, ...(m.pres && typeof m.pres === 'object' ? m.pres : {}) };
   p.lbl = { ...(p.lbl && typeof p.lbl === 'object' ? p.lbl : {}) };   // selalu salinan sendiri (AXO_DEFAULT.lbl jangan tercemar)
-  let stat = null, cab = null, committed = false, tab = 'axo', sibuk = false;
+  let stat = null, cab = null, committed = false, tab = tabAwal === 'lokasi' || tabAwal === 'render' ? tabAwal : 'axo', sibuk = false;
   try { stat = A.analyze(); } catch {}
   try { cab = cableInfo(m); } catch {}
   const touch = () => { if (!committed) { A.commit(); committed = true; } };   // satu langkah undo per sesi dialog
@@ -924,7 +931,7 @@ export function dlgPres() {
     catch (e) { console.error('aksonometri', e); return `<p class="err" style="padding:14px">Gambar aksonometri gagal dibuat: ${esc(e?.message || e)}. Coba tipe lain, atau kirim pesan ini ke tim.</p>`; }
   };
   const refreshView = () => { const v = $('#pxView'); if (v) v.innerHTML = svgOf(true); };
-  const tabsBar = () => `<div class="prestabs"><button type="button" data-ptab="axo" class="${tab === 'axo' ? 'on' : ''}">${icon('axo', 14)} Aksonometri</button><button type="button" data-ptab="lokasi" class="${tab === 'lokasi' ? 'on' : ''}">${icon('map', 14)} Analisis lokasi</button></div>`;
+  const tabsBar = () => `<div class="prestabs"><button type="button" data-ptab="axo" class="${tab === 'axo' ? 'on' : ''}">${icon('axo', 14)} Aksonometri</button><button type="button" data-ptab="lokasi" class="${tab === 'lokasi' ? 'on' : ''}">${icon('map', 14)} Analisis lokasi</button><button type="button" data-ptab="render" class="${tab === 'render' ? 'on' : ''}">${icon('video', 14)} Render realistis</button></div>`;
   const bindTabs = () => dlg.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { if (b.dataset.ptab !== tab) { tab = b.dataset.ptab; render(); } });
   // unduh SVG → PNG (skala 2,5–3×) sebagai berkas lokal
   const unduhPNG = async (svg, nama, btn, sc = 3) => {
@@ -945,6 +952,7 @@ export function dlgPres() {
   };
   const render = () => {
     if (tab === 'lokasi') return renderLokasi();
+    if (tab === 'render') return renderRender();
     let cos = [];
     try { cos = axoCallouts(m, p, stat, cab); } catch (e) { console.error('keterangan aksonometri', e); }
     const rows = cos.map(c => {
@@ -1059,6 +1067,41 @@ export function dlgPres() {
     };
     $('#lkPng').onclick = () => unduhPNG(SITE.lembarLokasiSVG(m, m.lokasi), `Analisis-lokasi-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}.png`, $('#lkPng'), 2.5);
   };
+  // ---- tab render realistis: kamera terbang mengikuti jalur yang digambar di denah, bisa direkam ----
+  const renderRender = () => {
+    const j = Array.isArray(m.pres?.jalur) ? m.pres.jalur : [], LVn = levels(m);
+    let pjg = 0;
+    for (let i = 1; i < j.length; i++) { const a = j[i - 1], b = j[i]; pjg += Math.hypot(b.x - a.x, b.y - a.y, Math.abs(b.f - a.f) * (m.floorH || 2)); }
+    const kec = clamp(+m.pres?.rKec || 1.2, 0.6, 3), tgg = clamp(+m.pres?.rTgg || 1.6, 1.2, 2.2);
+    openDlg('Presentasi — render realistis',
+      `${tabsBar()}
+       <p class="lead">Kamera "terbang" menyusuri bagian dalam RBW mengikuti jalur garis yang Anda gambar sendiri di denah — bisa naik-turun ke semua lantai — lalu hasilnya direkam jadi video. Mode realistis menyalakan tekstur beton/kayu/bata, bayangan lembut, dan pencahayaan sinematik: gelapnya mengikuti simulasi lux, lampu kamera menembus ruang gelap.</p>
+       <div class="lksaran" style="margin-top:0"><b>Jalur kamera</b>
+         ${j.length ? `<span>• ${j.length} titik · panjang ±${fmt(Math.round(pjg))} m · durasi ±${fmt(Math.max(3, Math.round(pjg / kec)))} detik · lantai ${[...new Set(j.map(q => (LVn[q.f]?.name || `Lantai ${q.f + 1}`).replace('Lantai ', '')))].join(' → ')}</span>` : '<span>• Belum digambar — klik "Gambar jalur kamera" di bawah, lalu klik titik-titik urutan jalannya kamera di denah. Untuk naik/turun, pindah tab lantai di atas denah lalu lanjut klik. Enter = selesai.</span>'}
+       </div>
+       <div class="g2" style="margin-top:12px">
+         <div><label for="rK">Kecepatan kamera — <b id="rKv">${fmt(kec)} m/dtk</b></label><input id="rK" type="range" min="0.6" max="3" step="0.1" value="${kec}"></div>
+         <div><label for="rT">Tinggi kamera dari lantai — <b id="rTv">${fmt(tgg)} m</b></label><input id="rT" type="range" min="1.2" max="2.2" step="0.05" value="${tgg}"></div>
+       </div>
+       <label class="chk2"><input type="checkbox" id="rRek" checked> Rekam video — .webm tersimpan otomatis di perangkat</label>
+       <label class="chk2"><input type="checkbox" id="rQ" checked> Kualitas realistis (tekstur + bayangan lembut + tone sinematik)</label>
+       <p class="tip">Mode realistis juga bisa dinyalakan manual di tampilan 3D lewat tombol "✨ Realistis". Saat render berjalan, tekan Esc untuk berhenti (video yang sudah terekam tetap tersimpan). Jalur ikut tersimpan di link desain.</p>`,
+      `<button type="button" class="pl-btn" id="rGambar">✏️ Gambar jalur kamera</button>${j.length >= 2 ? '<button type="button" class="pl-btn" id="rHapus">🗑 Hapus jalur</button><button type="button" class="pl-btn pl-primary" id="rMulai">▶ Mulai render</button>' : ''}<button type="button" class="pl-btn" id="pxOk">Tutup</button>`, true);
+    bindTabs();
+    $('#pxOk').onclick = () => dlg.close();
+    $('#rK').oninput = e => { touch(); m.pres.rKec = clamp(+e.target.value || 1.2, 0.6, 3); $('#rKv').textContent = `${fmt(m.pres.rKec)} m/dtk`; };
+    $('#rK').onchange = () => { A.save(); render(); };
+    $('#rT').oninput = e => { touch(); m.pres.rTgg = clamp(+e.target.value || 1.6, 1.2, 2.2); $('#rTv').textContent = `${fmt(m.pres.rTgg)} m`; };
+    $('#rT').onchange = () => A.save();
+    $('#rGambar').onclick = () => { dlg.close(); A.mulaiJalur(); };
+    const hb = $('#rHapus');
+    if (hb) hb.onclick = () => { touch(); delete m.pres.jalur; A.save(); render(); };
+    const mb = $('#rMulai');
+    if (mb) mb.onclick = () => {
+      const o = { kecepatan: m.pres.rKec || 1.2, tinggi: m.pres.rTgg || 1.6, rekam: $('#rRek').checked, qual: $('#rQ').checked };
+      dlg.close(); A.mulaiRender(o);
+    };
+  };
   try { render(); } catch (e) { console.error('dialog presentasi', e); A.hint(`Presentasi gagal dibuka: ${e?.message || e} — muat ulang halaman dengan Ctrl+F5 lalu coba lagi.`, 9000); }
 }
 
@@ -1075,7 +1118,8 @@ export function dlgHelp() {
     ['🔌 Kabel', 'Mode "Kabel" menggambar jalur kabel tiap channel — selalu siku mengikuti sirip/dinding, menembus terpal tapi tidak bata — plus total meter & jumlah klem (tiap 10 cm). Kabel hexagonal otomatis menghitung tinggi gedung.'],
     ['🐦 Simulasi burung', 'Di 3D: walet berputar di luar, terpanggil hexagonal, masuk LMB (kadang mutar dulu di void), mengejar suara tarik, menyebar ke ruang. Penghuni (punya titik sarang) langsung masuk. Jumlah walet diatur di kartu "Matahari & waktu".'],
     ['🪹 Titik sarang', 'Item "Titik sarang" menandai sarang baru / lama / polesan / jadi di sirip — untuk pemantauan & burung penghuni di simulasi.'],
-    ['🚶 Jalan di dalam', 'Di 3D tekan "Jalan di dalam": berjalan dengan WASD/panah, seret untuk menoleh, naiki tangga untuk pindah lantai, T = senter. Gelap-terangnya mengikuti simulasi lux; garis oranye = rantai tweeter tarik.'],
+    ['🚶 Jalan di dalam', 'Di 3D tekan "Jalan di dalam": berjalan dengan WASD/panah, seret untuk menoleh, T = senter. NAIK-TURUN LANTAI: tekan E (naik) / Q (turun), tombol −/+ "Lantai" di panel status, atau lewat tangga/lubang LAL. Gelap-terangnya mengikuti simulasi lux; garis oranye = rantai tweeter tarik.'],
+    ['🎥 Render realistis', 'Tombol "Presentasi" → tab "Render realistis": gambar jalur garis kamera di denah (pindah tab lantai untuk naik/turun ke semua lantai), lalu kamera terbang menyusuri bagian dalam RBW dengan tekstur beton/kayu/bata, bayangan lembut & pencahayaan sinematik — otomatis terekam jadi video .webm di perangkat. Tombol "✨ Realistis" di 3D menyalakan kualitas ini kapan saja.'],
     ['🗺️ Foto satelit', 'Kartu "Lokasi (satelit)" di panel kanan: screenshot Google Maps (mode satelit) lokasi Anda, unggah, atur lebar & putar — gedung terlihat di lahan aslinya.'],
     ['💰 RAB', 'Tombol "RAB": tabel nama item, jumlah (otomatis dari desain), harga satuan (bisa diedit), total, keterangan; bisa tambah baris & salin ke Excel/WA.'],
     ['🖼️ Presentasi', 'Tombol "Presentasi": aksonometri exploded ala diagram arsitek — pilih tipe (lengkap per lantai / interior / eksterior / breakdown item), gaya warna, jarak antar lapisan; item digambar detail (papan sirip sesuai jaraknya, corong tweeter sesuai arah, kusen LMB, sarang, kolam, tangga). Tiap bagian diberi garis keterangan yang teksnya BISA DIEDIT, disembunyikan, dipindah sisi kiri/kanan (tombol ↔), dan digeser naik-turun; hasil bisa diunduh PNG HD atau ikut PDF.'],
@@ -1105,7 +1149,7 @@ async function exportSheet() {
   try {
     const three = await A.load3D();
     const img3d = three.snapshotSheet(m, 1280, 960);   // semua lantai, tanpa burung / peta; tampilan 3D pengguna dikembalikan
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930b');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
     const url = URL.createObjectURL(blob), urlPdf = URL.createObjectURL(canvasPDF(cv));

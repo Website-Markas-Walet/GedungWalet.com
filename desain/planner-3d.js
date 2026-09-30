@@ -4,14 +4,14 @@
 // partikel aliran udara. Gedung dibangun ulang dari model setiap kali dipanggil; kawanan burung tetap hidup.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { derive, structure, floorRect, floorHt, rectDiff, wallSideRuns, levels, center, inRect } from './planner-geom.js?v=20260930';
-import { sunPos, simOf, luxColor, arahNama } from './planner-light.js?v=20260930';
-import { comfort, TINGKAT } from './planner-comfort.js?v=20260930';
-import { SARANG_WARNA } from './planner-data.js?v=20260930';
+import { derive, structure, floorRect, floorHt, rectDiff, wallSideRuns, levels, center, inRect } from './planner-geom.js?v=20260930b';
+import { sunPos, simOf, luxColor, arahNama } from './planner-light.js?v=20260930b';
+import { comfort, TINGKAT } from './planner-comfort.js?v=20260930b';
+import { SARANG_WARNA } from './planner-data.js?v=20260930b';
 
 let renderer, scene, camera, controls, host, raf, group, flock, sunL, hemi, legend, tagBox, statBox, bar, senter, sync3;
 const geoCache = new Map(), matCache = new Map();
-const st = { view: 'iso', mode: 'semua', burung: true, peta: 'nyaman', udara: false, walk: false };   // pilihan toolbar 3D
+const st = { view: 'iso', mode: 'semua', burung: true, peta: 'nyaman', udara: false, walk: false, qual: false };   // pilihan toolbar 3D
 let last = null, camKey = '', camTween = null, W3 = null, B3 = null, simSig = '', birds = [], flow = null, tags = [], junk = [], tPrev = 0, statT = 0, pergi = 0, siteT = { href: null, tex: null };
 const GAP = 2.5;        // jarak antar lantai pada tampilan terurai (m)
 // mode "jalan di dalam": posisi, arah pandang, tinggi mata, lantai, senter; tps = sudut pandang orang ketiga
@@ -31,6 +31,7 @@ export function mount(el) {
   renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   host.appendChild(renderer.domElement);
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(45, 1, 0.1, 600);
@@ -50,6 +51,8 @@ export function mount(el) {
   const div = cls => { const d = document.createElement('div'); d.className = cls; host.appendChild(d); return d; };
   tagBox = div('tags3'); bar = div('tb3'); statBox = div('stat3'); legend = div('legend');
   statBox.addEventListener('click', e => {
+    const lv = e.target.closest('[data-wklv]');
+    if (lv) { ubahLantai(lv.dataset.wklv === '+' ? 1 : -1); return; }
     const b = e.target.closest('[data-wkh]'); if (!b) return;
     wk.h = Math.max(1.3, Math.min(2, wk.h + (b.dataset.wkh === '+' ? 0.05 : -0.05))); statSet();
   });
@@ -69,10 +72,14 @@ export function mount(el) {
   window.addEventListener('resize', resize);
   // kontrol mode jalan: WASD / panah, seret = menoleh, T = senter, Esc = keluar
   window.addEventListener('keydown', e => {
-    if (!wk.on || host.hidden) return;
+    if (host.hidden) return;
     const k = e.key.toLowerCase();
+    if (flight && k === 'escape') { endFlight(true); return; }   // hentikan render realistis
+    if (!wk.on) return;
     if (k === 'escape') { walkToggle(); renderBar(); return; }
     if (k === 't') { senterSet(!wk.senter); renderBar(); return; }
+    if (k === 'e' || k === 'pageup') { ubahLantai(1); e.preventDefault(); return; }     // naik lantai langsung
+    if (k === 'q' || k === 'pagedown') { ubahLantai(-1); e.preventDefault(); return; }  // turun lantai langsung
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) { wk.keys[k] = 1; e.preventDefault(); }
   });
   window.addEventListener('keyup', e => { delete wk.keys[e.key.toLowerCase()]; });
@@ -91,7 +98,7 @@ function renderBar() {
     ? grp('walk', [['walk', '✕ Keluar mode jalan', true], ['tps', wk.tps ? '👤 Orang ketiga' : '👁 Pandangan mata', wk.tps], ['senter', '🔦 Senter (T)', wk.senter]])
     : grp('view', [['iso', '3D'], ['atas', 'Atas'], ['depan', 'Depan'], ['belakang', 'Belakang'], ['kiri', 'Kiri'], ['kanan', 'Kanan']].map(([v, t]) => [v, t, st.view === v]))
     + grp('mode', [['semua', 'Semua lantai'], ['lantai', 'Per lantai'], ['terurai', 'Terurai']].map(([v, t]) => [v, t, st.mode === v]))
-    + grp('sim', [['burung', 'Burung walet', st.burung], ['peta', `Peta: ${st.peta === 'nyaman' ? 'kenyamanan' : st.peta === 'lux' ? 'lux' : 'mati'}`, !!st.peta], ['udara', 'Aliran udara', st.udara]])
+    + grp('sim', [['burung', 'Burung walet', st.burung], ['peta', `Peta: ${st.peta === 'nyaman' ? 'kenyamanan' : st.peta === 'lux' ? 'lux' : 'mati'}`, !!st.peta], ['udara', 'Aliran udara', st.udara], ['qual', '✨ Realistis', st.qual]])
     + grp('walk', [['walk', '🚶 Jalan di dalam', false]]);
 }
 const rebuild = () => { if (last) build(last.model, last.active, last.opts); };
@@ -109,9 +116,45 @@ function geo(w, h, d) {
   if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d));
   return geoCache.get(k);
 }
+// Tekstur prosedural (kanvas, tanpa berkas eksternal) untuk mode "✨ Realistis".
+const texCache = new Map();
+function tex(nama) {
+  if (texCache.has(nama)) return texCache.get(nama);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const c = cv.getContext('2d');
+  const noise = (n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(20,16,10,${(Math.random() * a).toFixed(3)})`; const s = 1 + Math.random() * 2.5; c.fillRect(Math.random() * 256, Math.random() * 256, s, s); } };
+  if (nama === 'beton') {
+    c.fillStyle = '#cfcabd'; c.fillRect(0, 0, 256, 256); noise(2600, 0.09);
+    for (let i = 0; i < 7; i++) { c.strokeStyle = 'rgba(90,85,75,.09)'; c.lineWidth = 1 + Math.random() * 2; c.beginPath(); c.moveTo(Math.random() * 256, 0); c.lineTo(Math.random() * 256, 256); c.stroke(); }
+  } else if (nama === 'plester') { c.fillStyle = '#efece4'; c.fillRect(0, 0, 256, 256); noise(1500, 0.055); }
+  else if (nama === 'kayu') {
+    c.fillStyle = '#96662f'; c.fillRect(0, 0, 256, 256);
+    for (let y = 0; y < 256; y += 32) {
+      c.fillStyle = `rgba(58,34,12,${0.16 + Math.random() * 0.1})`; c.fillRect(0, y, 256, 2);
+      for (let i = 0; i < 16; i++) { c.strokeStyle = 'rgba(52,30,10,.13)'; c.lineWidth = 0.8; const yy = y + 4 + Math.random() * 26; c.beginPath(); c.moveTo(0, yy); c.bezierCurveTo(80, yy + Math.random() * 3 - 1.5, 180, yy + Math.random() * 3 - 1.5, 256, yy); c.stroke(); }
+    }
+  } else if (nama === 'bata') {
+    c.fillStyle = '#cdbfae'; c.fillRect(0, 0, 256, 256);
+    for (let r = 0; r < 8; r++) for (let k2 = -1; k2 < 5; k2++) { const off = r % 2 ? 32 : 0; c.fillStyle = `rgb(${168 + Math.random() * 18},${138 + Math.random() * 14},${108 + Math.random() * 12})`; c.fillRect(k2 * 64 + off + 2, r * 32 + 2, 60, 28); }
+    noise(700, 0.05);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  texCache.set(nama, t);
+  return t;
+}
 function mat(color, op, side) {
-  const k = `${color}|${op}|${side || ''}`;
-  if (!matCache.has(k)) matCache.set(k, new THREE.MeshLambertMaterial({ color, transparent: !!op, opacity: op || 1, depthWrite: !op, side: side || THREE.FrontSide }));
+  const k = `${st.qual ? 'q' : 'l'}|${color}|${op}|${side || ''}`;
+  if (!matCache.has(k)) {
+    const dasar = { color, transparent: !!op, opacity: op || 1, depthWrite: !op, side: side || THREE.FrontSide };
+    if (st.qual) {   // realistis: material PBR + tekstur beton/kayu/bata (hanya pada permukaan pejal)
+      const TEXOF = { [COL.slab]: ['beton', 1.6], [COL.ground]: ['beton', 8], [COL.wallOut]: ['plester', 1.3], [COL.sirip]: ['kayu', 1], [COL.tangga]: ['kayu', 1], [COL.pintu]: ['kayu', 1], [COL.bata]: ['bata', 1.2], [COL.kolom]: ['beton', 0.8], [COL.balok]: ['beton', 0.8] };
+      const tx = !op && TEXOF[color];
+      const t2 = tx ? tex(tx[0]).clone() : null;
+      if (t2) { t2.needsUpdate = true; t2.repeat.set(tx[1], tx[1]); }
+      matCache.set(k, new THREE.MeshStandardMaterial({ ...dasar, ...(t2 ? { color: 0xffffff, map: t2 } : {}), roughness: tx && tx[0] === 'kayu' ? 0.6 : 0.86, metalness: 0.03 }));
+    } else matCache.set(k, new THREE.MeshLambertMaterial(dasar));
+  }
   return matCache.get(k);
 }
 function mesh(g, color, x, y, z, op = 0, side) {
@@ -148,6 +191,8 @@ function hexa(x, y, z, op) {
 // Model denah: x = lebar, y (denah) = panjang → sumbu z three; tinggi = sumbu y three.
 export function build(model, active = 0, opts = {}) {
   last = { model, active, opts };
+  renderer.toneMapping = st.qual ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;   // realistis: tone mapping sinematik
+  renderer.toneMappingExposure = st.qual ? 1.15 : 1;
   if (group) scene.remove(group);
   junk.forEach(o => o.dispose()); junk = [];
   group = new THREE.Group();
@@ -642,16 +687,91 @@ function tickWalk(dt) {
     camera.rotation.order = 'YXZ'; camera.rotation.set(wk.pitch, wk.yaw, 0);
   }
   // gelap seperti aslinya: cahaya mengikuti lux di posisi (di luar gedung = terang); senter menembus gelap
+  const r = redup(px, py, y, wk.lv);
+  wk.lux = r.lux;
+  senter.intensity = wk.senter ? (r.k < 0.6 ? 6 : 2.2) : 0;
+}
+// Redupkan pencahayaan sesuai lux pada posisi (dipakai mode jalan & render realistis).
+function redup(px, py, y, lv) {
   const luar = px < -0.2 || px > B3.W + 0.2 || py < -0.2 || py > B3.L + 0.2 || y > B3.top - 0.1;
-  const q = !luar && W3?.at ? W3.at(Math.min(wk.lv, B3.base.length - 1), px, py) : null;
-  wk.lux = luar ? null : q ? q.lux : 0;
-  const k = luar ? 1 : Math.max(0.05, Math.min(1, 0.06 + (wk.lux ?? 3) / 40));
+  const q = !luar && W3?.at ? W3.at(Math.min(lv, B3.base.length - 1), px, py) : null;
+  const lux = luar ? null : q ? q.lux : 0;
+  const k = luar ? 1 : Math.max(0.05, Math.min(1, 0.06 + (lux ?? 3) / 40));
   if (lightBase) {
     sunL.intensity = lightBase.sun * k;
     hemi.intensity = lightBase.hemi * Math.max(0.1, k);
     scene.background = lightBase.bg.clone().multiplyScalar(Math.max(0.18, k));
   }
-  senter.intensity = wk.senter ? (k < 0.6 ? 6 : 2.2) : 0;
+  return { k, lux };
+}
+// Pindah lantai langsung di mode jalan (E/Q, PageUp/PageDown, atau tombol di panel status) —
+// tangga/LAL tetap bisa dipakai, tapi tidak wajib (permintaan pemilik: bisa naik-turun sesuai lantai).
+function ubahLantai(d) {
+  if (!wk.on || !B3) return;
+  wk.lv = Math.max(0, Math.min(B3.base.length - 1, wk.lv + d));
+  wk.stair = null; statT = 0; statSet();
+}
+// ---------- render realistis: kamera terbang mengikuti jalur yang digambar di denah, bisa direkam ----------
+let flight = null;
+export function mulaiRender(o = {}) {
+  if (!last || !B3) return false;
+  const j = (o.jalur || []).filter(p => Number.isFinite(+p.x) && Number.isFinite(+p.y));
+  if (j.length < 2) return false;
+  if (o.qual !== false && !st.qual) { st.qual = true; rebuild(); renderBar(); }
+  if (wk.on) walkToggle();
+  const tg = Math.max(1, Math.min(2.4, +o.tinggi || 1.6));
+  const pts = j.map(p => new THREE.Vector3(B3.X(+p.x), (B3.base[Math.max(0, Math.min(B3.base.length - 1, Math.round(+p.f || 0)))] || 0) + tg, B3.Z(+p.y)));
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
+  const len = curve.getLength(), kec = Math.max(0.4, Math.min(4, +o.kecepatan || 1.2));
+  flight = { curve, dur: Math.max(3, len / kec), t: 0, t0: performance.now(), onEnd: o.onEnd, rec: null, cam: { p: camera.position.clone(), t: controls.target.clone() } };
+  controls.enabled = false; camTween = null;
+  if (o.rekam) {
+    try {
+      const stream = renderer.domElement.captureStream(30);
+      const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(t2 => window.MediaRecorder && MediaRecorder.isTypeSupported(t2));
+      if (mime) {
+        const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 9e6 }), chunks = [];
+        mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        mr.onstop = () => {
+          const url = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' })), el = document.createElement('a');
+          el.href = url; el.download = `render-rbw-${(last.model.name || 'walet').replace(/[^\w-]+/g, '-')}.webm`;
+          document.body.append(el); el.click(); el.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        };
+        mr.start(250); flight.rec = mr;
+      }
+    } catch (e) { console.warn('rekam render', e); }
+  }
+  statT = 0; statSet();
+  return true;
+}
+export const _dbgFlight = () => ({ ada: !!flight, t: flight?.t, dur: flight?.dur, cam: [camera?.position.x, camera?.position.y, camera?.position.z].map(v => Math.round(v * 100) / 100), ctl: controls?.enabled, statTeks: statBox?.textContent?.slice(0, 60) });
+function endFlight(batal) {
+  if (!flight) return;
+  const f = flight; flight = null;
+  try { f.rec?.stop(); } catch {}
+  controls.enabled = true;
+  if (f.cam) { camera.position.copy(f.cam.p); controls.target.copy(f.cam.t); controls.update(); }
+  camera.rotation.set(0, 0, 0);
+  senter.intensity = 0;
+  if (lightBase) { sunL.intensity = lightBase.sun; hemi.intensity = lightBase.hemi; scene.background = lightBase.bg; }
+  statT = 0; statSet();
+  f.onEnd?.(batal);
+}
+function tickFlight() {
+  if (!flight || !B3) return;
+  flight.t = (performance.now() - flight.t0) / 1000;   // jam nyata — video tetap sesuai durasi walau FPS turun saat merekam
+  const u0 = Math.min(1, flight.t / flight.dur);
+  const u = u0 * u0 * (3 - 2 * u0);   // berangkat & berhenti mulus
+  const pos = flight.curve.getPointAt(u), ahead = flight.curve.getPointAt(Math.min(1, u + 0.015));
+  camera.position.copy(pos);
+  camera.lookAt(ahead.x, ahead.y - 0.02, ahead.z);
+  const px = pos.x + B3.W / 2, py = pos.z + B3.L / 2;
+  let lv = 0;
+  for (let i = 0; i < B3.base.length; i++) if (pos.y >= B3.base[i] - 0.2) lv = i;
+  const r = redup(px, py, pos.y, lv);
+  senter.intensity = r.k < 0.7 ? 5 : 1.2;   // lampu kamera menembus ruang gelap
+  if (u0 >= 1) endFlight(false);
 }
 function legendSet() {
   const rows = [['#3a3f45', 'Sekat terpal'], ['#b3a08c', 'Sekat bata'], ['#8a5a2b', 'Papan sirip'], ['#378add', 'Void / kolam'], ['#d85a30', 'LMB'], ['#534ab7', 'Tweeter inap'], ['#c62828', 'Tweeter tarik'], ['#6a1b9a', 'Hexagonal'], ['#2E7D32', 'Sarang jadi · <span style="color:#F9A825">polesan</span> · <span style="color:#C62828">baru</span>']];
@@ -660,11 +780,18 @@ function legendSet() {
   legend.innerHTML = rows.map(([c, n]) => `<div><b style="background:${c}"></b>${n}</div>`).join('') + '<div style="margin-top:4px">Seret = putar · Scroll = zoom</div>';
 }
 function statSet() {
+  if (flight) {
+    const pc = Math.round(100 * Math.min(1, flight.t / flight.dur));
+    statBox.innerHTML = `🎥 <b>Render realistis</b> — ${pc}%${flight.rec ? ' · merekam video (.webm)' : ''} · Esc = hentikan`;
+    statBox.hidden = false;
+    return;
+  }
   if (wk.on) {
     const lv = B3 ? Math.min(wk.lv, B3.base.length - 1) : 0;
     const lux = wk.lux == null ? 'di luar (terang)' : wk.lux < 0.01 ? '< 0,01 lux — gelap pekat' : `±${(wk.lux < 10 ? wk.lux.toFixed(1) : Math.round(wk.lux)).toString().replace('.', ',')} lux`;
     statBox.innerHTML = `🚶 <b>Mode jalan${wk.tps ? ' · orang ketiga' : ''}</b> · ${last ? levels(last.model)[lv]?.name || '' : ''} · ${lux}`
-      + `<br>WASD / panah = jalan · seret = menoleh · naik-turun lewat tangga / lubang LAL · T = senter · Esc = keluar`
+      + `<br>Lantai <button type="button" data-wklv="-">−</button> <b>${last ? levels(last.model)[lv]?.name?.replace('Lantai ', '') || lv + 1 : lv + 1}</b> <button type="button" data-wklv="+">+</button> (atau tombol E naik / Q turun) · tangga & lubang LAL juga bisa`
+      + `<br>WASD / panah = jalan · seret = menoleh · T = senter · Esc = keluar`
       + `<br>Tinggi orang <button type="button" data-wkh="-">−</button> <b>${wk.h.toFixed(2).replace('.', ',')} m</b> <button type="button" data-wkh="+">+</button>`
       + ` · garis oranye menyala = rantai tweeter tarik sinkron`;
     statBox.hidden = false;
@@ -708,8 +835,8 @@ export function show() {
   const loop = t => {
     raf = requestAnimationFrame(loop);
     const dt = Math.min(0.05, Math.max(0, (t - tPrev) / 1000)); tPrev = t;
-    tickCam(dt); tickBirds(dt); tickFlow(dt); tickWalk(dt);
-    if (!wk.on) controls.update();
+    tickCam(dt); tickBirds(dt); tickFlow(dt); tickWalk(dt); tickFlight();
+    if (!wk.on && !flight) controls.update();
     renderer.render(scene, camera); updateTags();
     if ((statT -= dt) <= 0) { statT = 0.6; statSet(); }
   };
