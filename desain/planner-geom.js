@@ -2,7 +2,7 @@
 // (area yang dikelilingi sekat = satu ruang; sekat yang menempel otomatis tersambung; LAR & celah bawah sekat gantung =
 // pintunya), jalan keluar tiap ruang ke arah void, fungsi LAR (inap/jalur/void), ruang inap (zona dibagi sekat),
 // arah hadap tweeter, rantai tweeter tarik (tidak menembus sekat), dan papan sirip.
-import { RULES, ROLE_ORDER } from './planner-data.js';
+import { RULES, ROLE_ORDER } from './planner-data.js?v=20260930';
 
 export const WALL_T = { ext: 0.2, sekat: 0.12 };
 export const isLar = t => t === 'lar' || t === 'larj';

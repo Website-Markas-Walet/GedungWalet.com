@@ -4,9 +4,9 @@
 // Penggerak: efek cerobong — beda kerapatan udara dalam (hangat & lembap, lebih ringan) dan luar menurut jam — serta
 // tekanan angin Cp·½ρv² di tiap sisi gedung. Tekanan zona dicari dengan Newton-Raphson sampai massa udara tiap zona
 // seimbang. Hasil: debit tiap bukaan (masuk / keluar), pertukaran udara (ACH) tiap ruang.
-import { SIM_DEFAULT, RULES } from './planner-data.js';
-import { levels, spaces, floorHt, floorRect } from './planner-geom.js';
-import { sunPos, skyLux, facadeAz, arahNama } from './planner-light.js';
+import { SIM_DEFAULT, RULES } from './planner-data.js?v=20260930';
+import { levels, spaces, floorHt, floorRect } from './planner-geom.js?v=20260930';
+import { sunPos, skyLux, facadeAz, arahNama } from './planner-light.js?v=20260930';
 
 const G = 9.81;
 const CP = [[0, 0.6], [45, 0.3], [90, -0.5], [135, -0.4], [180, -0.3]];   // koefisien tekanan angin dinding gedung rendah

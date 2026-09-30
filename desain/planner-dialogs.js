@@ -1,16 +1,16 @@
 // Dialog Walet Planner: pilihan awal (manual / pengamatan cepat), pengaturan proyek, tanya-jawab pengamatan,
 // selesai & kirim WhatsApp, link desain, dan lembar desain untuk admin.
-import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js';
-import { floorSVG } from './planner-draw.js';
-import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js';
-import { luxTxt } from './planner-light.js';
-import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js';
-import { rabRows } from './planner-rab.js';
-import * as SK from './planner-sketch.js';
-import * as SND from './planner-suara.js';
-import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js';
-import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js';
-import * as SITE from './planner-site.js';
+import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930';
+import { floorSVG } from './planner-draw.js?v=20260930';
+import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930';
+import { luxTxt } from './planner-light.js?v=20260930';
+import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930';
+import { rabRows } from './planner-rab.js?v=20260930';
+import * as SK from './planner-sketch.js?v=20260930';
+import * as SND from './planner-suara.js?v=20260930';
+import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930';
+import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930';
+import * as SITE from './planner-site.js?v=20260930';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -200,7 +200,7 @@ export function dlgFinish() {
 
 // ---------- ekspor PDF multi-lembar (centang lembar yang diikutkan) ----------
 export async function dlgPDF() {
-  const { LEMBAR } = await import('./planner-pdf.js');
+  const { LEMBAR } = await import('./planner-pdf.js?v=20260930');
   openDlg('Ekspor PDF — pilih lembar',
     `<p class="lead">Setiap lembar berisi gambaran semua lantai untuk satu tema, lengkap dengan penjelasan & legenda. Centang yang mau diikutkan ke PDF.</p>
      <div class="pdfl">${LEMBAR.map(([k, nm]) => `<label class="chk"><input type="checkbox" data-pk="${k}" checked> ${nm}</label>`).join('')}</div>
@@ -217,7 +217,7 @@ export async function dlgPDF() {
     try {
       const m = A.model;
       const img3d = keys.includes('lengkap') ? (await A.load3D()).snapshotSheet(m, 1280, 960) : null;
-      const { buildPDF } = await import('./planner-pdf.js');
+      const { buildPDF } = await import('./planner-pdf.js?v=20260930');
       const blob = await buildPDF(m, keys, img3d, t => { btn.textContent = t; });
       const url = URL.createObjectURL(blob), el = document.createElement('a');
       el.href = url; el.download = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${keys.length}lembar.pdf`;
@@ -234,7 +234,7 @@ export async function downloadPDF(btn) {
   const t0 = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = 'Menyiapkan PDF…'; }
   try {
     const m = A.model, three = await A.load3D(), img3d = three.snapshotSheet(m, 1280, 960);
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const url = URL.createObjectURL(canvasPDF(cv));
     const el = document.createElement('a');
@@ -918,7 +918,11 @@ export function dlgPres() {
   try { stat = A.analyze(); } catch {}
   try { cab = cableInfo(m); } catch {}
   const touch = () => { if (!committed) { A.commit(); committed = true; } };   // satu langkah undo per sesi dialog
-  const svgOf = edit => axoSVG(m, { ...p, s: 26, edit, brand: !edit }, stat, cab);
+  // bila gambar gagal dibangun, tampilkan pesannya di panel pratinjau — jangan pernah gagal diam-diam
+  const svgOf = edit => {
+    try { return axoSVG(m, { ...p, s: 26, edit, brand: !edit }, stat, cab); }
+    catch (e) { console.error('aksonometri', e); return `<p class="err" style="padding:14px">Gambar aksonometri gagal dibuat: ${esc(e?.message || e)}. Coba tipe lain, atau kirim pesan ini ke tim.</p>`; }
+  };
   const refreshView = () => { const v = $('#pxView'); if (v) v.innerHTML = svgOf(true); };
   const tabsBar = () => `<div class="prestabs"><button type="button" data-ptab="axo" class="${tab === 'axo' ? 'on' : ''}">${icon('axo', 14)} Aksonometri</button><button type="button" data-ptab="lokasi" class="${tab === 'lokasi' ? 'on' : ''}">${icon('map', 14)} Analisis lokasi</button></div>`;
   const bindTabs = () => dlg.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { if (b.dataset.ptab !== tab) { tab = b.dataset.ptab; render(); } });
@@ -941,7 +945,8 @@ export function dlgPres() {
   };
   const render = () => {
     if (tab === 'lokasi') return renderLokasi();
-    const cos = axoCallouts(m, p, stat, cab);
+    let cos = [];
+    try { cos = axoCallouts(m, p, stat, cab); } catch (e) { console.error('keterangan aksonometri', e); }
     const rows = cos.map(c => {
       const key = `${p.tipe}:${c.id}`, ov = p.lbl[key] || {}, off = ov.on === 0;
       const sisi = ov.sd === 'l' ? '◀' : ov.sd === 'r' ? '▶' : '↔';
@@ -1054,7 +1059,7 @@ export function dlgPres() {
     };
     $('#lkPng').onclick = () => unduhPNG(SITE.lembarLokasiSVG(m, m.lokasi), `Analisis-lokasi-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}.png`, $('#lkPng'), 2.5);
   };
-  render();
+  try { render(); } catch (e) { console.error('dialog presentasi', e); A.hint(`Presentasi gagal dibuka: ${e?.message || e} — muat ulang halaman dengan Ctrl+F5 lalu coba lagi.`, 9000); }
 }
 
 // ---------- pahami fitur ----------
@@ -1100,7 +1105,7 @@ async function exportSheet() {
   try {
     const three = await A.load3D();
     const img3d = three.snapshotSheet(m, 1280, 960);   // semua lantai, tanpa burung / peta; tampilan 3D pengguna dikembalikan
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
     const url = URL.createObjectURL(blob), urlPdf = URL.createObjectURL(canvasPDF(cv));

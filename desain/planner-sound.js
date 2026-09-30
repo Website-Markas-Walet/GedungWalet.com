@@ -3,9 +3,9 @@
 // pelemahan jarak 20·log10(d) dan pelemahan penghalang di garis pandang: sekat bata ±22 dB, terpal penuh ±10 dB,
 // sekat gantung ±4 dB (bukaan LAR tidak menghalangi). dB dijumlah secara energi per kategori untuk tiap ruang.
 // Jadwal timer AC ikut dihitung: kategori yang sedang mati pada jam simulasi tidak bersuara. Perkiraan kasar.
-import { SIM_DEFAULT, AUDIO_DEFAULT, dbTarget } from './planner-data.js';
-import { levels, floorRect, spaces, wallSegs, openingsOn, solidPieces, center } from './planner-geom.js';
-import { channels, chCover } from './planner-cable.js';
+import { SIM_DEFAULT, AUDIO_DEFAULT, dbTarget } from './planner-data.js?v=20260930';
+import { levels, floorRect, spaces, wallSegs, openingsOn, solidPieces, center } from './planner-geom.js?v=20260930';
+import { channels, chCover } from './planner-cable.js?v=20260930';
 
 const CAT = { twinap: 'inap', twtarik: 'tarik', hexa: 'panggil' };
 const ATT = s => (s.bahan === 'bata' || s.ext ? 22 : s.jenis === 'gantung' ? 4 : 10);

@@ -2,10 +2,10 @@
 // cahaya (ruang inap harus gelap < 1 lux), akses dari LMB (jumlah pintu/lubang yang dilewati), suara (tweeter tarik /
 // inap di ruang itu — walet mengejar suara tarik lebih dulu), jalan keluar anakan ke arah terang, dan pertukaran udara.
 // Hasil per ruang: skor 0–100, tingkat nyaman / kurang / tidak nyaman, dan alasannya.
-import { RULES } from './planner-data.js';
-import { levels, center } from './planner-geom.js';
-import { simulate } from './planner-light.js';
-import { simulateAir } from './planner-air.js';
+import { RULES } from './planner-data.js?v=20260930';
+import { levels, center } from './planner-geom.js?v=20260930';
+import { simulate } from './planner-light.js?v=20260930';
+import { simulateAir } from './planner-air.js?v=20260930';
 
 export const TINGKAT = { nyaman: '#2E7D32', kurang: '#F9A825', tidak: '#C62828', jalan: '#78909C' };
 
