@@ -72,7 +72,7 @@ const vp = { s: 60, ox: 0, oy: 0 };
 
 // ---------- model ----------
 function normalize(m) {
-  m.kolom = m.kolom || RULES.kolom;
+  m.kolom = clamp(+m.kolom || RULES.kolom, 1.5, 8);   // jarak antar kolom/balok bebas (tanpa balok anakan)
   if (m.showStruktur === undefined) m.showStruktur = true;
   m.siripTebal = m.siripTebal || RULES.siripTebalCm; m.siripLebar = m.siripLebar || RULES.siripLebarCm;
   m.papanPjg = clamp(+m.papanPjg || RULES.papanPanjang, 1, 6);   // panjang papan per batang saat pesan di toko (m)
@@ -1383,12 +1383,13 @@ function projectPanel() {
     <div class="row"><span class="k">Panjang (m)</span><input type="number" step="0.5" min="2" max="60" id="pH" value="${model.h}"></div>
     <div class="row"><span class="k">Tinggi lantai standar (m)</span><input type="number" step="0.1" min="1.8" max="4" id="pFH" value="${model.floorH}"></div>
     <div class="row"><span class="k">Jumlah lantai</span><input type="number" step="1" min="1" max="8" id="pN" value="${model.floors.length}"></div>
-    <div class="row"><span class="k">Jarak kolom</span><select id="pK">${[3, 4, 5, 6].map(k => `<option value="${k}"${k === model.kolom ? ' selected' : ''}>${k} m</option>`).join('')}</select></div>
+    <div class="row"><span class="k">Jarak kolom &amp; balok (m)</span><input type="number" step="0.5" min="1.5" max="8" id="pK" value="${model.kolom}"></div>
     <label class="chkrow"><input type="checkbox" id="pS"${model.showStruktur !== false ? ' checked' : ''}> Tampilkan kolom &amp; balok</label>
+    <p class="tip" style="margin:2px 0 0">Balok utama mengikuti garis kolom saja — tanpa balok anakan. Buku: modul 4 m; DED memakai 5 m.</p>
     <p class="tip">Ubah angka lalu Enter — elemen di luar batas baru dirapatkan. Pilih elemen di katalog lalu klik di denah. Seret area kosong = kotak pilih banyak objek; geser tampilan dengan alat Geser (H), Spasi+seret, atau tombol tengah/kanan mouse; scroll untuk zoom.</p>
     <div class="acts"><button type="button" id="pEdit">${icon('plan', 14)} Pengaturan proyek</button><button type="button" id="pSurvey">${icon('spark', 14)} Pengamatan cepat</button></div></div>`;
   ['pW', 'pH', 'pFH', 'pN'].forEach(id => $('#' + id).onchange = () => applyProject({ w: +$('#pW').value, h: +$('#pH').value, floorH: +$('#pFH').value, floors: +$('#pN').value }));
-  $('#pK').onchange = e => { commit(); model.kolom = +e.target.value; renderAll(); };
+  $('#pK').onchange = e => { commit(); model.kolom = clamp(+e.target.value || RULES.kolom, 1.5, 8); e.target.value = model.kolom; renderAll(); };
   $('#pS').onchange = e => { model.showStruktur = e.target.checked; save(); renderAll(); };
   $('#pEdit').onclick = () => D.dlgManual(false);
   $('#pSurvey').onclick = () => D.dlgSurvey({ regenerate: true });
@@ -1580,6 +1581,7 @@ async function toggleRec() {
 }
 $('#btnRec').onclick = toggleRec; recBtn();
 $('#btnRAB').innerHTML = `${icon('table', 15)} RAB`; $('#btnRAB').onclick = () => D.dlgRAB();
+$('#btnPres').innerHTML = `${icon('axo', 15)} Presentasi`; $('#btnPres').onclick = () => D.dlgPres();
 $('#btnHelp').innerHTML = icon('help', 16); $('#btnHelp').onclick = () => D.dlgHelp();
 D.setupAdmin($('#btnExport'));
 // panel kiri & kanan bisa disembunyikan agar denah lapang

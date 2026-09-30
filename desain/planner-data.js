@@ -207,6 +207,7 @@ export const ICONS = {
   nest: '<path d="M5 13c0 4 3 7 7 7s7-3 7-7"/><path d="M5 13h14M8 13c1-2 2.5-3 4-3s3 1 4 3"/>',
   map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  axo: '<path d="M12 2l8 4.6v4.8l-8 4.6-8-4.6V6.6z"/><path d="M12 7.2 20 11.4M12 7.2 4 11.4M12 7.2V16"/><path d="M4 15.4l8 4.6 8-4.6" stroke-dasharray="2.5 2.5"/>',
 };
 
 export function icon(name, size = 18) {

@@ -14,6 +14,8 @@ import { climate, simulateAir } from './planner-air.js';
 import { analyze } from './planner-analysis.js';
 import { makeSheetCanvas, pagesPDF } from './planner-export.js';
 import { audioElevSVG, defaultLayout, AMPLI_KEYS } from './planner-audio2d.js';
+import { axoSVG, AXO_TIPE, AXO_PALET, AXO_DEFAULT } from './planner-axo.js';
+import { lembarLokasiSVG, teksLokasi } from './planner-site.js';
 
 export const LEMBAR = [
   ['tarik', 'Denah suara tarik (tweeter & kabel)'],
@@ -28,6 +30,8 @@ export const LEMBAR = [
   ['vent', 'Denah ventilasi'],
   ['db', 'Denah suara dB per ruang'],
   ['lengkap', 'Denah lengkap gabungan + 3D'],
+  ['presentasi', 'Aksonometri presentasi (exploded)'],
+  ['lokasi', 'Analisis lokasi (site analysis)'],
   ['analisis', 'Analisis kelayakan'],
   ['rab', 'RAB perlengkapan'],
 ];
@@ -152,6 +156,8 @@ export async function buildPDF(m, keys, img3d, prog = () => {}) {
     await new Promise(r => setTimeout(r));   // beri napas UI
     try {
     if (k === 'lengkap') { cvs.push(await makeSheetCanvas(m, a, img3d)); continue; }
+    if (k === 'presentasi') { cvs.push(await presPage(m, a, cab, no, total)); continue; }
+    if (k === 'lokasi') { cvs.push(await lokasiPage(m, no, total)); continue; }
     if (k === 'analisis') { cvs.push(analisisPage(m, a, no, total)); continue; }
     if (k === 'rab') { rabPages(m, a, cab, no, total).forEach(cv => cvs.push(cv)); continue; }
     if (k === 'audio') { cvs.push(await audioPage(m, a, cab, chs, no, total)); continue; }
@@ -373,6 +379,66 @@ function rabPages(m, a, cab, no, totalLbr) {
   return out;
 }
 // Lembar ruang audio: DESAIN RUANG AUDIO tampak depan (dinding berisi perangkat) + tabel channel + perangkat + jadwal.
+// Lembar aksonometri presentasi: gambar exploded sesuai pengaturan tab "Presentasi" (tipe, palet,
+// jarak lapisan, teks keterangan yang sudah diedit pengguna) — keterangan digambar di dalam SVG-nya.
+async function presPage(m, a, cab, no, total) {
+  const p = { ...AXO_DEFAULT, ...(m.pres && typeof m.pres === 'object' ? m.pres : {}) };
+  const { cv, c } = page('Lembar aksonometri presentasi', m, no, total);
+  const svg = axoSVG(m, { ...p, s: 30, edit: false, brand: false }, a, cab);
+  const im = await loadImg(svgUrl(svg));
+  const areaW = PW - 2 * MG - RIGHT - 40, areaH = PH - 170;
+  const sc = Math.min(1.25, areaW / im.width, areaH / im.height);
+  c.drawImage(im, MG + (areaW - im.width * sc) / 2, 132 + (areaH - im.height * sc) / 2, im.width * sc, im.height * sc);
+  const tipeNm = (AXO_TIPE.find(([k]) => k === p.tipe) || AXO_TIPE[0])[1], paletNm = (AXO_PALET.find(([k]) => k === p.palet) || AXO_PALET[0])[1];
+  rightCol(c, {
+    desc: [
+      `Aksonometri exploded tipe "${tipeNm}" — tiap lantai/lapisan ditarik ke atas mengikuti garis bantu putus-putus supaya susunan desain terbaca sekali lihat.`,
+      p.tipe === 'item' ? 'Tiap lapisan = satu kategori item (struktur, plat & void, sekat, sirip, kabel, tweeter, bukaan, sarang, ruang audio) dari seluruh lantai.'
+        : p.tipe === 'eksterior' ? 'Massa bangunan per lantai dengan LMB pada fasad, atap, dan arah hadap — untuk menjelaskan wujud luar gedung.'
+        : 'Tiap lantai digambar lengkap: plat, sekat terpal/bata, kolom, void, tweeter, LMB, hingga titik sarang.',
+      'Garis tarikan di kiri-kanan = keterangan nama bagian + spesifikasinya; teks & posisinya bisa diedit lewat tombol "Presentasi" di editor.',
+      `Gaya warna: ${paletNm.toLowerCase()} · jarak antar lapisan ${fmt(p.gap)} m (bisa diatur 0–6 m).`,
+    ],
+    stats: [
+      ['Dimensi gedung', `${fmt(m.w)} × ${fmt(m.h)} m`],
+      ['Jumlah lantai', `${m.floors.length}${m.menara ? ' + menara' : ''}`],
+      ['Tinggi total', `±${fmt(a?.tinggi ?? 0)} m`],
+      ['Modul kolom & balok', `${fmt(m.kolom)} m (tanpa balok anakan)`],
+    ],
+    legend: [],
+    foot: 'Gambar presentasi (indikatif) untuk menjelaskan desain — bukan gambar kerja. Ukuran & jumlah mengikuti desain pada saat PDF dibuat.',
+  });
+  return cv;
+}
+
+// Lembar analisis lokasi: panel-panel site analysis dari data yang tersimpan di m.lokasi
+// (jalan/kebisingan, jalur matahari, angin, topografi, ekologi + kesimpulan RBW).
+async function lokasiPage(m, no, total) {
+  const { cv, c } = page('Lembar analisis lokasi (site analysis)', m, no, total);
+  if (!(m.lokasi?.amb && Object.keys(m.lokasi.amb).length)) {
+    c.font = `15px ${FONT}`; c.fillStyle = '#5a6472';
+    c.fillText('Belum ada data lokasi. Buka tombol "Presentasi" → tab "Analisis lokasi", tempel titik Google Maps,', MG, 150);
+    c.fillText('klik "Analisis", lalu buat PDF lagi — lembar ini akan terisi panel jalan, matahari, angin, topografi & ekologi.', MG, 174);
+    return cv;
+  }
+  const svg = lembarLokasiSVG(m, m.lokasi);
+  const im = await loadImg(svgUrl(svg));
+  const areaW = PW - 2 * MG - RIGHT - 40, areaH = PH - 160;
+  const sc = Math.min(areaW / im.width, areaH / im.height);
+  c.drawImage(im, MG, 124 + (areaH - im.height * sc) / 2, im.width * sc, im.height * sc);
+  const t = teksLokasi(m, m.lokasi);
+  rightCol(c, {
+    desc: [
+      `Titik lokasi ${m.lokasi.la}, ${m.lokasi.lo} (dari Google Maps). Data lingkungan: jalan & tutupan lahan © OpenStreetMap, angin 12 bulan & elevasi Open-Meteo.`,
+      ...t.jalan.slice(0, 1), ...t.angin.slice(0, 1), ...t.topo.slice(0, 1), ...t.eko.slice(0, 2),
+    ],
+    stats: [],
+    legend: [],
+    foot: 'Analisis lokasi = perkiraan dari data peta terbuka; kondisi lapangan (populasi walet, bising sesaat, banjir) tetap perlu dicek langsung. ' + (t.saran.length ? 'Kesimpulan: ' + t.saran.join(' ') : ''),
+  });
+  return cv;
+}
+
 async function audioPage(m, a, cab, chs, no, total) {
   const { cv, c } = page('Lembar desain ruang audio (tampak depan)', m, no, total);
   const LV = levels(m);
