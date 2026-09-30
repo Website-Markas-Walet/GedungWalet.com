@@ -208,6 +208,7 @@ export const ICONS = {
   map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
   axo: '<path d="M12 2l8 4.6v4.8l-8 4.6-8-4.6V6.6z"/><path d="M12 7.2 20 11.4M12 7.2 4 11.4M12 7.2V16"/><path d="M4 15.4l8 4.6 8-4.6" stroke-dasharray="2.5 2.5"/>',
+  video: '<rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 11l6-3.5v9L15 13"/>',
 };
 
 export function icon(name, size = 18) {

@@ -1,8 +1,8 @@
 // Lembar desain (PNG) yang dikirim tim GedungWalet ke WhatsApp pelanggan. Hanya dipakai dalam mode admin.
-import { TYPES, RULES } from './planner-data.js';
-import { floorSVG, symbolSVG } from './planner-draw.js';
-import { levels } from './planner-geom.js';
-import { luxTxt } from './planner-light.js';
+import { TYPES, RULES } from './planner-data.js?v=20260930b';
+import { floorSVG, symbolSVG } from './planner-draw.js?v=20260930b';
+import { levels } from './planner-geom.js?v=20260930b';
+import { luxTxt } from './planner-light.js?v=20260930b';
 
 const FONT = 'Roboto, Arial, sans-serif';
 const HEAD = 'Raleway, Roboto, Arial, sans-serif';

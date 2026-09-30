@@ -401,3 +401,7 @@ body.pl-lock .pl #dlg{visibility:visible}
 .pl-dlg .lksaran{margin-top:12px;border:1px solid var(--line);border-radius:10px;background:var(--soft);padding:10px 14px;display:flex;flex-direction:column;gap:4px;font-size:12.5px}
 .pl-dlg .lksaran b{font-size:13px}
 @media(max-width:760px){.pl-dlg .lkgrid{grid-template-columns:1fr}}
+
+/* tab render realistis */
+.pl-dlg label.chk2{display:flex;align-items:center;gap:8px;font-weight:500;margin-top:8px}
+.pl-dlg label.chk2 input{width:auto}

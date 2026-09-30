@@ -4,7 +4,7 @@
 // dan dirangkum jadi lembar panel ala diagram arsitek: akses jalan (kebisingan), jalur matahari,
 // mawar angin, topografi, dan ekologi, masing-masing dengan bacaan khusus rumah walet.
 // Ringkasan (m.lokasi.amb) sengaja kecil & berupa angka bulat supaya ikut tersimpan di link desain.
-import { ARAH8, RULES, SUARA } from './planner-data.js';
+import { ARAH8, RULES, SUARA } from './planner-data.js?v=20260930b';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const f1 = n => Math.round(n * 10) / 10;

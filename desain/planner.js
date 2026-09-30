@@ -1,18 +1,18 @@
 // Walet Planner — editor denah rumah walet (2D + 3D): state, interaksi, panel properti & analisis.
-import { CATALOG, TYPES, RULES, TARIK_ROLES, TW, LAR_FUNGSI, ARAH8, LANGIT, SISI, SARANG_JENIS, icon } from './planner-data.js';
-import { climate } from './planner-air.js';
-import { simulateSound, nilaiDb } from './planner-sound.js';
-import { cableInfo, channels, chCover } from './planner-cable.js';
-import * as SND from './planner-suara.js';
-import { derive, snapToWall, snapHexa, isLar, center, inRect, twinapRekomendasi, zonePattern, siripDetail, siripVolume, pushOffWalls, snap90, dist, distToRect, angDiff, floorRect, floorHt, clampInto, isFull, ovArea, levels } from './planner-geom.js';
-import { drawFloor, symbolSVG } from './planner-draw.js';
-import { generate } from './planner-auto.js';
-import { analyze } from './planner-analysis.js';
-import { simulate, heatURL, luxColor, luxTxt, kategori, LUX_STOPS, simOf, arahNama, facadeAz } from './planner-light.js';
-import { simulateAir, suhuLuar } from './planner-air.js';
-import { comfort, TINGKAT } from './planner-comfort.js';
-import * as D from './planner-dialogs.js';
-import * as SK from './planner-sketch.js';
+import { CATALOG, TYPES, RULES, TARIK_ROLES, TW, LAR_FUNGSI, ARAH8, LANGIT, SISI, SARANG_JENIS, icon } from './planner-data.js?v=20260930b';
+import { climate } from './planner-air.js?v=20260930b';
+import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930b';
+import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930b';
+import * as SND from './planner-suara.js?v=20260930b';
+import { derive, snapToWall, snapHexa, isLar, center, inRect, twinapRekomendasi, zonePattern, siripDetail, siripVolume, pushOffWalls, snap90, dist, distToRect, angDiff, floorRect, floorHt, clampInto, isFull, ovArea, levels } from './planner-geom.js?v=20260930b';
+import { drawFloor, symbolSVG } from './planner-draw.js?v=20260930b';
+import { generate } from './planner-auto.js?v=20260930b';
+import { analyze } from './planner-analysis.js?v=20260930b';
+import { simulate, heatURL, luxColor, luxTxt, kategori, LUX_STOPS, simOf, arahNama, facadeAz } from './planner-light.js?v=20260930b';
+import { simulateAir, suhuLuar } from './planner-air.js?v=20260930b';
+import { comfort, TINGKAT } from './planner-comfort.js?v=20260930b';
+import * as D from './planner-dialogs.js?v=20260930b';
+import * as SK from './planner-sketch.js?v=20260930b';
 
 const $ = s => document.querySelector(s);
 const LS_KEY = 'waletPlanner.v2';
@@ -30,10 +30,10 @@ const dirName = d => DIRS.reduce((a, b) => (angDiff(a[0], d) <= angDiff(b[0], d)
 const roleName = r => (TARIK_ROLES.find(([k]) => k === r) || [, 'Tarik'])[1];
 
 // ---------- state ----------
-let model = null, cur = 0, tool = 'select', view = '2d', three = null, drag = null, der = null, calib = null, lastA = null;
+let model = null, cur = 0, tool = 'select', view = '2d', three = null, threeP = null, drag = null, der = null, calib = null, lastA = null;
 let sel = new Set();                                   // id objek & sekat terpilih (boleh banyak)
 let undoStack = [], redoStack = [];
-let spaceDown = false, measures = [], luxOn = false, luxRes = null, airOn = false, dbOn = false, kabelOn = false, mark = null, pendRute = null;
+let spaceDown = false, measures = [], luxOn = false, luxRes = null, airOn = false, dbOn = false, kabelOn = false, mark = null, pendRute = null, pendKam = null;
 let hidCh = new Set(), kabelSemua = false, lblOn = true;   // sembunyikan jalur per channel · daftar channel semua/lantai ini · keterangan ruang
 // coretan pena (stylus/jari/mouse) di atas denah — alat presentasi, tidak ikut desain/link
 let coret = [], penTimer = null;
@@ -209,7 +209,21 @@ const app = {
     if (on && isFull(model, t)) Object.assign(t, topSmallRect(model));
     if (!on && !isFull(model, t)) { delete t.fx; delete t.fy; delete t.fw; delete t.fh; }
   },
-  async load3D() { if (!three) { three = await import('./planner-3d.js'); three.mount($('#view3d')); } return three; },
+  async load3D() {   // janji tunggal — dua pemanggil beriringan tidak boleh me-mount dua kali
+    if (!threeP) threeP = import('./planner-3d.js?v=20260930b').then(t => { t.mount($('#view3d')); return (three = t); });
+    return threeP;
+  },
+  mulaiJalur,
+  async mulaiRender(o = {}) {   // render realistis: pindah ke 3D, terbang ikuti jalur kamera (opsional direkam .webm)
+    const jalur = model.pres?.jalur;
+    if (!Array.isArray(jalur) || jalur.length < 2) { hint('Gambar jalur kamera dulu: tombol Presentasi → Render realistis → "Gambar jalur kamera".', 8000); return; }
+    setView('3d');
+    const t = await app.load3D();
+    t.build(model, cur, opts3d());
+    t.show();
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));   // biarkan setView selesai membangun dulu
+    if (!t.mulaiRender({ jalur, ...o })) hint('Jalur kamera belum lengkap (minimal 2 titik).');
+  },
 };
 D.init(app);
 
@@ -489,6 +503,21 @@ function renderPlan() {
     const P2 = pendRute.pts.map(([px2, py2]) => `${round(vp.ox + px2 * vp.s, 1)},${round(vp.oy + py2 * vp.s, 1)}`);
     html += `<g pointer-events="none">${P2.length > 1 ? `<polyline points="${P2.join(' ')}" fill="none" stroke="${warna}" stroke-width="2.6" stroke-dasharray="7 5" stroke-linejoin="round"/>` : ''}${P2.map(pt2 => `<circle cx="${pt2.split(',')[0]}" cy="${pt2.split(',')[1]}" r="4" fill="#fff" stroke="${warna}" stroke-width="2"/>`).join('')}</g>`;
   }
+  // jalur kamera render realistis: garis + titik bernomor; titik lantai lain digambar pudar dengan label lantainya
+  if (tool === 'kamera') {
+    const jp = (pendKam ? pendKam.pts : model.pres?.jalur) || [], seg = [];
+    const P3 = q => [round(vp.ox + q.x * vp.s, 1), round(vp.oy + q.y * vp.s, 1)];
+    for (let i = 1; i < jp.length; i++) {
+      const a = jp[i - 1], b = jp[i], [x1, y1] = P3(a), [x2, y2] = P3(b), adaDi = a.f === cur || b.f === cur;
+      seg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#00ACC1" stroke-width="${adaDi ? 2.6 : 1.4}" stroke-opacity="${adaDi ? 0.9 : 0.35}"${a.f !== b.f ? ' stroke-dasharray="4 4"' : ''}/>`);
+      if (a.f !== b.f) seg.push(`<text x="${round((x1 + x2) / 2 + 6, 1)}" y="${round((y1 + y2) / 2 - 4, 1)}" font-size="11" fill="#00838F" font-weight="700">${b.f > a.f ? '⬆ naik' : '⬇ turun'}</text>`);
+    }
+    jp.forEach((q, i) => {
+      const [x, y] = P3(q), aktif = q.f === cur;
+      seg.push(`<circle cx="${x}" cy="${y}" r="${aktif ? 7.5 : 5}" fill="${aktif ? '#00ACC1' : '#b7dde2'}" stroke="#fff" stroke-width="1.6"/><text x="${x}" y="${round(y + 3.4, 1)}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">${i + 1}</text>${aktif ? '' : `<text x="${round(x + 9, 1)}" y="${round(y - 6, 1)}" font-size="9" fill="#00838F">${q.f >= model.floors.length ? 'Menara' : 'Lt ' + (q.f + 1)}</text>`}`);
+    });
+    html += `<g pointer-events="none">${seg.join('')}</g>`;
+  }
   // alat "Geser / perbesar foto": bingkai + pegangan sudut foto satelit (fotonya yang digeser, bukan gedung)
   if (tool === 'site' && site?.src) {
     const R = siteRect(site), rad = ((site.rot || 0) * Math.PI) / 180, co = Math.cos(rad), si = Math.sin(rad);
@@ -623,7 +652,7 @@ function showTip(e, ms) {
 }
 
 svg.addEventListener('contextmenu', e => e.preventDefault());
-svg.addEventListener('dblclick', () => { if (tool === 'rute') finishRute(); });
+svg.addEventListener('dblclick', () => { if (tool === 'rute') finishRute(); if (tool === 'kamera') finishKamera(); });
 svg.addEventListener('pointerleave', hideTip);
 svg.addEventListener('pointerdown', e => {
   if (mark) { mark = null; renderPlan(); }
@@ -643,6 +672,11 @@ svg.addEventListener('pointerdown', e => {
     const last = pendRute.pts[pendRute.pts.length - 1];
     if (last && !e.shiftKey) { if (Math.abs(q.x - last[0]) > Math.abs(q.y - last[1])) q.y = last[1]; else q.x = last[0]; }
     pendRute.pts.push([round(q.x), round(q.y)]);
+    renderPlan(); return;
+  }
+  if (tool === 'kamera') {   // jalur kamera render realistis: klik titik-titik; pindah tab lantai untuk naik/turun
+    if (!pendKam) { setTool('select'); return; }
+    pendKam.pts.push({ x: round(clamp(p.x, -8, model.w + 8), 2), y: round(clamp(p.y, -8, model.h + 8), 2), f: cur });
     renderPlan(); return;
   }
   if (tool === 'site') {   // geser / perbesar foto satelit (bukan gedungnya)
@@ -784,8 +818,10 @@ document.addEventListener('keydown', e => {
   else if (mod && k === 'a') { e.preventDefault(); selectAll(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') deleteSel();
   else if (e.key === 'Enter' && tool === 'rute') { e.preventDefault(); finishRute(); }
+  else if (e.key === 'Enter' && tool === 'kamera') { e.preventDefault(); finishKamera(); }
   else if (e.key === 'Escape') {
     if (tool === 'rute' && pendRute) { pendRute = null; setTool('select'); hint('Gambar jalur kabel dibatalkan.'); return; }
+    if (tool === 'kamera' && pendKam) { pendKam = null; setTool('select'); hint('Gambar jalur kamera dibatalkan — jalur lama tetap tersimpan.'); renderPlan(); return; }
     if (tool === 'ukur' && measures.some(q => q.f === cur)) { measures = measures.filter(q => q.f !== cur); renderPlan(); renderSide(); return; }
     drag = null; sel.clear(); setTool('select');
   }
@@ -1209,6 +1245,24 @@ function kabelCard() {
     <p class="tip">Jalur otomatis rapi: lurus sepanjang baris tweeter, belok satu SUDUT siku antar baris; titik <b>ujung</b> = tweeter terakhir jalur; <b>R</b> = naik-turun antar lantai → ruang audio (garis abu-abu). Ikon mata = sembunyikan jalur channel. ✏️ = gambar jalur sendiri untuk lantai aktif. <b>⨯ = hapus jalur otomatis</b> (kosong, tidak dihitung) supaya benar-benar dibuat manual; ↩ mengembalikannya. Kabel hexagonal otomatis naik setinggi gedung + menara. Belum termasuk cadangan ±10%.</p></div>`;
 }
 // gambar / hapus jalur kabel manual channel untuk lantai aktif
+// ---------- jalur kamera untuk render realistis (tombol Presentasi → Render realistis) ----------
+function mulaiJalur() {
+  pendKam = { pts: [] };
+  setTool('kamera');
+  hint('Klik titik-titik jalur kamera di denah (boleh mulai dari luar gedung). Pindah tab lantai untuk lanjut naik/turun antar lantai. Enter / dobel-klik = selesai · Esc = batal.', 12000);
+  renderPlan();
+}
+function finishKamera() {
+  const pts = pendKam?.pts || [];
+  pendKam = null; setTool('select');
+  if (pts.length < 2) { hint('Jalur kamera batal — perlu minimal 2 titik.'); renderPlan(); return; }
+  commit();
+  model.pres = model.pres && typeof model.pres === 'object' ? model.pres : {};
+  model.pres.jalur = pts.slice(0, 40);
+  save(); renderPlan();
+  hint(`Jalur kamera tersimpan (${model.pres.jalur.length} titik).`);
+  D.dlgPres('render');
+}
 function startRute(id) {
   const c = channels(model).find(x => x.id === id);
   if (!c || !chCover(c, cur)) { hint('Channel ini tidak mencakup lantai aktif.'); return; }
