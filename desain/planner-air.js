@@ -4,9 +4,9 @@
 // Penggerak: efek cerobong — beda kerapatan udara dalam (hangat & lembap, lebih ringan) dan luar menurut jam — serta
 // tekanan angin Cp·½ρv² di tiap sisi gedung. Tekanan zona dicari dengan Newton-Raphson sampai massa udara tiap zona
 // seimbang. Hasil: debit tiap bukaan (masuk / keluar), pertukaran udara (ACH) tiap ruang.
-import { SIM_DEFAULT, RULES } from './planner-data.js?v=20260930b';
-import { levels, spaces, floorHt, floorRect } from './planner-geom.js?v=20260930b';
-import { sunPos, skyLux, facadeAz, arahNama } from './planner-light.js?v=20260930b';
+import { SIM_DEFAULT, RULES } from './planner-data.js?v=20260930c';
+import { levels, spaces, floorHt, floorRect } from './planner-geom.js?v=20260930c';
+import { sunPos, skyLux, facadeAz, arahNama } from './planner-light.js?v=20260930c';
 
 const G = 9.81;
 const CP = [[0, 0.6], [45, 0.3], [90, -0.5], [135, -0.4], [180, -0.3]];   // koefisien tekanan angin dinding gedung rendah
@@ -16,10 +16,12 @@ const cpAt = th => {
   return -0.3;
 };
 const SIDE_ANG = { depan: 0, kanan: 90, belakang: 180, kiri: 270 };
-export const suhuLuar = jam => 29 + 4 * Math.sin((2 * Math.PI * (jam - 9)) / 24);   // perkiraan harian: ±25 °C (03.00) – ±33 °C (15.00)
+// Suhu luar harian ≈ rata-rata + amplitudo·sin (bawaan 29 ± 4 °C: ±25 °C pukul 03.00 – ±33 °C pukul 15.00); analisis lokasi bisa mengisi rata-rata/amplitudo dari iklim setempat.
+export const suhuLuar = (jam, sim) => (Number.isFinite(+sim?.tluar) ? +sim.tluar : 29) + (Number.isFinite(+sim?.tamp) ? +sim.tamp : 4) * Math.sin((2 * Math.PI * (jam - 9)) / 24);
+const rhLuar = sim => (Number.isFinite(+sim?.rhl) ? +sim.rhl : 75);   // RH luar rata-rata (bawaan 75%)
 const esat = T => 610.94 * Math.exp((17.625 * T) / (T + 243.04));                  // tekanan uap jenuh (Pa)
 const rhoAir = (T, rh) => (101325 - 0.378 * (rh / 100) * esat(T)) / (287.05 * (T + 273.15));   // udara lembap lebih ringan
-const RH_LUAR = 75, CD = 0.6, VENT_A = Math.PI * 0.0508 ** 2, VENT_CD = 0.45, BOCOR = 2e-4;
+const CD = 0.6, VENT_A = Math.PI * 0.0508 ** 2, VENT_CD = 0.45, BOCOR = 2e-4;
 // Ventilasi: paralon 4" menembus dinding ±82 cm di bawah plafon (60 cm di bawah sirip), elbow, lalu pipa turun 1 m —
 // ujung dalamnya 1 m lebih rendah; kolom udara di pipa tegak ikut dihitung dengan memakai ketinggian ujung dalam.
 const VENT_Z = 0.82, PIPA_TURUN = 1;
@@ -43,7 +45,7 @@ export function simulateAir(m) {
   const sim = { ...SIM_DEFAULT, ...(m.sim || {}) }, LV = levels(m);
   const sig = JSON.stringify([m.w, m.h, m.floorH, sim, m.floors, m.menara || null]);
   if (cache.sig === sig) return cache.res;
-  const Tin = +sim.suhu, Tout = suhuLuar(+sim.jam), rhoIn = rhoAir(Tin, +sim.rh), rhoOut = rhoAir(Tout, RH_LUAR);
+  const Tin = +sim.suhu, Tout = suhuLuar(+sim.jam, sim), rhoIn = rhoAir(Tin, +sim.rh), rhoOut = rhoAir(Tout, rhLuar(sim));
   const v = Math.max(0, +sim.anginKec || 0), windAng = SIDE_ANG[sim.anginDari] ?? 0, pw = 0.5 * rhoOut * v * v;
   // zona = ruang tiap lantai; ketinggian alas lantai bertumpuk
   const zones = [], y0 = [], sps = [];
@@ -136,7 +138,7 @@ export function climate(m) {
   const sim = { ...SIM_DEFAULT, ...(m.sim || {}) }, LV = levels(m);
   const sig = JSON.stringify([m.w, m.h, m.floorH, sim, m.floors, m.menara || null]);
   if (cCache.sig === sig) return cCache.res;
-  const sun = sunPos(sim), sky = skyLux(sim, sun), Tout = suhuLuar(+sim.jam), Tmean = 29, top = m.floors.length - 1;
+  const sun = sunPos(sim), sky = skyLux(sim, sun), Tout = suhuLuar(+sim.jam, sim), Tmean = Number.isFinite(+sim.tluar) ? +sim.tluar : 29, top = m.floors.length - 1;
   let A = null; try { A = simulateAir(m); } catch {}
   const achOf = li => { const zs = A ? A.zones.filter(z => z.li === li && z.vol >= 1) : []; return zs.length ? zs.reduce((s, z) => s + z.ach, 0) / zs.length : 1; };
   const irr = az => { const cosI = Math.cos(sun.el * RAD2) * Math.cos((sun.az - az) * RAD2); return (sky.dn * Math.max(0, cosI) * 0.9 + sky.dh * 0.4) / 110; };   // W/m² ≈ lux/110
@@ -148,7 +150,7 @@ export function climate(m) {
     if (i >= top) T += sun.el > 0 ? 0.9 * (sky.gh / 48000) : -0.2;
     T -= Math.min(1.2, (kolam / luas) * 10);
     const ach = achOf(i), f = 1 / (1 + ach / 8);
-    const RH = Math.max(45, Math.min(97, 75 + (i === 0 ? 15 : Math.max(-4, 10 - 3.5 * i)) * f + Math.min(12, (kolam / luas) * 60)));
+    const RH = Math.max(45, Math.min(97, rhLuar(sim) + (i === 0 ? 15 : Math.max(-4, 10 - 3.5 * i)) * f + Math.min(12, (kolam / luas) * 60)));
     const sides = [['depan', 0, -1], ['kanan', 1, 0], ['belakang', 0, 1], ['kiri', -1, 0]].map(([sisi, nx, ny]) => {
       const az = facadeAz(nx, ny, sim.hadap), I = irr(az);
       const Tsi = Math.round((T + 0.3 * Math.max(0, Tout + (0.6 * I) / 17 - T)) * 10) / 10;

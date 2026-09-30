@@ -5,7 +5,7 @@
 export const WA_NUMBER = '6285235350662';
 export const TW = 0.16;   // ukuran tapak simbol tweeter di denah (m)
 // Pengaturan simulasi cahaya & udara (disimpan di model.sim). hadap = arah kompas sisi depan gedung (°, 0 = utara).
-export const SIM_DEFAULT = { hadap: 0, jam: 13, bulan: 0, langit: 'berawan', lintang: -6, suhu: 28, rh: 85, anginDari: 'depan', anginKec: 2, walet: 20 };
+export const SIM_DEFAULT = { hadap: 0, jam: 13, bulan: 0, langit: 'berawan', lintang: -6, suhu: 28, rh: 85, anginDari: 'depan', anginKec: 2, walet: 20, tluar: 29, tamp: 4, rhl: 75 };
 export const ARAH8 = [[0, 'Utara'], [45, 'Timur laut'], [90, 'Timur'], [135, 'Tenggara'], [180, 'Selatan'], [225, 'Barat daya'], [270, 'Barat'], [315, 'Barat laut']];
 export const LANGIT = [['cerah', 'Cerah'], ['berawan', 'Berawan'], ['mendung', 'Mendung']];
 export const SISI = [['depan', 'Depan'], ['kanan', 'Kanan'], ['belakang', 'Belakang'], ['kiri', 'Kiri']];

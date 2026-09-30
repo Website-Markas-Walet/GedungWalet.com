@@ -1,16 +1,16 @@
 // Dialog Walet Planner: pilihan awal (manual / pengamatan cepat), pengaturan proyek, tanya-jawab pengamatan,
 // selesai & kirim WhatsApp, link desain, dan lembar desain untuk admin.
-import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930b';
-import { floorSVG } from './planner-draw.js?v=20260930b';
-import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930b';
-import { luxTxt } from './planner-light.js?v=20260930b';
-import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930b';
-import { rabRows } from './planner-rab.js?v=20260930b';
-import * as SK from './planner-sketch.js?v=20260930b';
-import * as SND from './planner-suara.js?v=20260930b';
-import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930b';
-import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930b';
-import * as SITE from './planner-site.js?v=20260930b';
+import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930c';
+import { floorSVG } from './planner-draw.js?v=20260930c';
+import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930c';
+import { luxTxt } from './planner-light.js?v=20260930c';
+import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930c';
+import { rabRows } from './planner-rab.js?v=20260930c';
+import * as SK from './planner-sketch.js?v=20260930c';
+import * as SND from './planner-suara.js?v=20260930c';
+import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930c';
+import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930c';
+import * as SITE from './planner-site.js?v=20260930c';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -191,7 +191,7 @@ export function dlgFinish() {
       `⭐ Skor kelayakan: ${a.score}/100`,
       ...a.notes.filter(n => n.lvl !== 'ok').slice(0, 3).map(n => `• ${n.txt}`),
       ...(note ? [`📝 Catatan: ${note}`] : []),
-      '', `🔗 Link desain: ${buildShareLink(m)}`, '', 'Mohon dikirimkan hasil desain lengkapnya ke WhatsApp saya. Terima kasih.',
+      '', `🔗 Link desain: ${buildShareLink(m, { ringan: true })}`, '', 'Mohon dikirimkan hasil desain lengkapnya ke WhatsApp saya. Terima kasih.',
     ];
     window.open(`https://api.whatsapp.com/send?phone=${WA_NUMBER}&text=${encodeURIComponent(lines.join('\n'))}`, '_blank', 'noopener');
     try { window.dataLayer?.push({ event: 'planner_finish', size: `${m.w}x${m.h}`, floors: m.floors.length, score: a.score, mode: m.survey ? 'pengamatan' : 'manual' }); } catch {}
@@ -200,7 +200,7 @@ export function dlgFinish() {
 
 // ---------- ekspor PDF multi-lembar (centang lembar yang diikutkan) ----------
 export async function dlgPDF() {
-  const { LEMBAR } = await import('./planner-pdf.js?v=20260930b');
+  const { LEMBAR } = await import('./planner-pdf.js?v=20260930c');
   openDlg('Ekspor PDF — pilih lembar',
     `<p class="lead">Setiap lembar berisi gambaran semua lantai untuk satu tema, lengkap dengan penjelasan & legenda. Centang yang mau diikutkan ke PDF.</p>
      <div class="pdfl">${LEMBAR.map(([k, nm]) => `<label class="chk"><input type="checkbox" data-pk="${k}" checked> ${nm}</label>`).join('')}</div>
@@ -217,7 +217,7 @@ export async function dlgPDF() {
     try {
       const m = A.model;
       const img3d = keys.includes('lengkap') ? (await A.load3D()).snapshotSheet(m, 1280, 960) : null;
-      const { buildPDF } = await import('./planner-pdf.js?v=20260930b');
+      const { buildPDF } = await import('./planner-pdf.js?v=20260930c');
       const blob = await buildPDF(m, keys, img3d, t => { btn.textContent = t; });
       const url = URL.createObjectURL(blob), el = document.createElement('a');
       el.href = url; el.download = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${keys.length}lembar.pdf`;
@@ -234,7 +234,7 @@ export async function downloadPDF(btn) {
   const t0 = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = 'Menyiapkan PDF…'; }
   try {
     const m = A.model, three = await A.load3D(), img3d = three.snapshotSheet(m, 1280, 960);
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930b');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930c');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const url = URL.createObjectURL(canvasPDF(cv));
     const el = document.createElement('a');
@@ -315,7 +315,9 @@ const CODE = { void: 'V', jalur: 'J', inap: 'I', audio: 'A', lmb: 'L', lar: 'R',
 const DECODE = Object.fromEntries(Object.entries(CODE).map(([k, v]) => [v, k]));
 const FIXED = new Set(['twinap', 'twtarik']);
 const cm = v => Math.round(v * 100);
-export function buildShareLink(m) {
+// opts.ringan = link untuk pesan WhatsApp (URL-nya dikodekan dua kali → harus pendek): tanpa data presentasi & analisis lokasi
+// (lokasi hanya koordinat — data bisa diambil ulang satu klik). Tanpa opts, link membawa semuanya (salin/tempel).
+export function buildShareLink(m, opts = {}) {
   const encF = f => {
     const der = derive(m, f), skip = new Set(), auto = new Set();
     der.zones.forEach(z => {   // zona inap yang tweeter-nya persis pola standar (semua ruang hasil pembagian sekat)
@@ -352,9 +354,9 @@ export function buildShareLink(m) {
     ...(m.audio ? { au: m.audio } : {}),
     ...(m.kabel?.ch?.length || m.kabel?.rute ? { kb: { ...(m.kabel.ch?.length ? { ch: m.kabel.ch } : {}), ...(m.kabel.rute && Object.keys(m.kabel.rute).length ? { r: m.kabel.rute } : {}) } } : {}),
     ...(adaRab ? { rb: m.rab } : {}),
-    ...(adaPx ? { px: { t: px.tipe, p: px.palet, g: px.gap, r: px.garis ? 1 : 0, k: px.ket ? 1 : 0, ...(Object.keys(px.lbl || {}).length ? { l: px.lbl } : {}),
+    ...(adaPx && !opts.ringan ? { px: { t: px.tipe, p: px.palet, g: px.gap, r: px.garis ? 1 : 0, k: px.ket ? 1 : 0, ...(Object.keys(px.lbl || {}).length ? { l: px.lbl } : {}),
       ...(px.jalur?.length >= 2 ? { j: px.jalur } : {}), ...(px.rKec ? { rk: px.rKec } : {}), ...(px.rTgg ? { rt: px.rTgg } : {}) } } : {}),
-    ...(m.lokasi && Number.isFinite(+m.lokasi.la) ? { lk: m.lokasi } : {}),
+    ...(m.lokasi && Number.isFinite(+m.lokasi.la) ? { lk: opts.ringan ? { la: m.lokasi.la, lo: m.lokasi.lo } : m.lokasi } : {}),
     ...(tb !== RULES.siripTebalCm || lb !== RULES.siripLebarCm || pj !== RULES.papanPanjang ? { sp: [tb, lb, pj] } : {}) };
   const json = JSON.stringify(slim);
   const enc = window.LZString ? LZString.compressToEncodedURIComponent(json) : encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
@@ -424,6 +426,9 @@ export function parseShare(hash) {
       if (o.suhu != null) r.suhu = num(o.suhu, 15, 40, 28);
       if (o.rh != null) r.rh = num(o.rh, 30, 100, 85);
       if (o.anginKec != null) r.anginKec = num(o.anginKec, 0, 20, 2);
+      if (o.tluar != null) r.tluar = num(o.tluar, 15, 35, 29);
+      if (o.tamp != null) r.tamp = num(o.tamp, 0, 8, 4);
+      if (o.rhl != null) r.rhl = num(o.rhl, 30, 100, 75);
       if (o.walet != null) r.walet = num(o.walet, 3, 60, 20);
       if (LANGIT.some(([k]) => k === o.langit)) r.langit = o.langit;
       if (SISI.some(([k]) => k === o.anginDari)) r.anginDari = o.anginDari;
@@ -575,7 +580,7 @@ function sendSketchWA(o, file) {
 }
 export function sketchWA(i) {
   const m = A.model, sk = SK.getSketch(m, i), drawn = m.floors.some(f => f.items.length || f.walls.length);
-  sendSketchWA({ name: m.name, city: m.city, w: m.w, h: m.h, n: m.floors.length, floor: m.floors[i].name, link: drawn ? buildShareLink(m) : '' }, sk ? SK.sketchFile(sk) : null);
+  sendSketchWA({ name: m.name, city: m.city, w: m.w, h: m.h, n: m.floors.length, floor: m.floors[i].name, link: drawn ? buildShareLink(m, { ringan: true }) : '' }, sk ? SK.sketchFile(sk) : null);
 }
 // Kode tim & alamat Worker disimpan per perangkat (localStorage), tidak pernah di link desain.
 export function dlgTeam(next) {
@@ -1037,14 +1042,17 @@ export function dlgPres(tabAwal) {
   const renderLokasi = () => {
     const lk = m.lokasi, ada = lk?.amb && Object.keys(lk.amb).length;
     const panels = ada ? SITE.panelsLokasi(m, lk) : null, tS = ada ? SITE.teksLokasi(m, lk) : null;
+    const a0 = lk?.amb || {}, lengkap = a0.rd && a0.ek && a0.bg && a0.po && a0.tp && a0.el && a0.wr && a0.ik;
     openDlg('Presentasi — analisis lokasi',
       `${tabsBar()}
        <div class="lkbar"><input id="lkIn" value="${lk ? `${lk.la}, ${lk.lo}` : ''}" placeholder="Tempel link Google Maps atau koordinat — contoh: -6.2334, 106.8342"><button type="button" class="pl-btn pl-blue" id="lkGo">${ada ? 'Analisis ulang' : 'Analisis'}</button></div>
-       <p class="tip">Cara ambil titik: buka lokasi di <b>Google Maps</b> → klik kanan titiknya → klik koordinat (tersalin otomatis) → tempel di sini. Link pendek maps.app.goo.gl tidak memuat koordinat — buka dulu, lalu salin koordinat/link panjangnya. Data: jalan &amp; lahan © OpenStreetMap, angin 12 bulan &amp; elevasi Open-Meteo (gratis). Hasil tersimpan di desain &amp; ikut link.</p>
+       <p class="tip">Cara ambil titik: buka lokasi di <b>Google Maps</b> → klik kanan titiknya → klik koordinat (tersalin otomatis) → tempel di sini. Link pendek maps.app.goo.gl tidak memuat koordinat — buka dulu, lalu salin koordinat/link panjangnya. Data gratis: jalan, bangunan, lahan &amp; fasilitas © OpenStreetMap; elevasi, angin, suhu, kelembapan &amp; hujan 12 bulan Open-Meteo. Pengambilan ±10–60 detik. Hasil tersimpan di desain &amp; ikut link.</p>
        <p class="tip" id="lkStat" style="min-height:16px;font-weight:600"></p>
+       ${ada && !lengkap ? '<p class="tip" style="color:#b26a00;font-weight:600">Sebagian data belum ada (mis. hasil versi lama atau server sedang menolak) — klik "Analisis ulang": hanya bagian yang kurang yang diambil.</p>' : ''}
        ${ada ? `<div class="lkgrid">${panels.map(pn => `<figure class="lkcard">${pn.svg}<figcaption>${pn.teks.map(x => `<span>• ${esc(x)}</span>`).join('')}</figcaption></figure>`).join('')}</div>
-       <div class="lksaran"><b>Kesimpulan untuk RBW</b>${tS.saran.map(x => `<span>• ${esc(x)}</span>`).join('')}</div>` : '<p class="tip" style="margin-top:10px">Belum ada data — tempel titik lokasi lalu klik <b>Analisis</b>. Lembar hasilnya juga tersedia di ekspor PDF.</p>'}`,
-      `${ada ? `<button type="button" class="pl-btn" id="lkTerap" title="Isi arah/kecepatan angin simulasi & lingkungan pengamatan dari data lokasi">Terapkan ke simulasi</button><button type="button" class="pl-btn" id="lkPng">Unduh PNG lembar</button>` : ''}<button type="button" class="pl-btn pl-primary" id="pxOk">Selesai</button>`, true);
+       <div class="lksaran"><b>Implikasi untuk desain RBW</b>${tS.implikasi.map(x => `<span>• ${esc(x)}</span>`).join('')}</div>
+       <div class="lksaran lkbatas"><b>Catatan &amp; batasan data</b>${SITE.BATASAN.map(x => `<span>• ${esc(x)}</span>`).join('')}</div>` : '<p class="tip" style="margin-top:10px">Belum ada data — tempel titik lokasi lalu klik <b>Analisis</b>. Lembar hasilnya juga tersedia di ekspor PDF.</p>'}`,
+      `${ada ? `<button type="button" class="pl-btn" id="lkTerap" title="Isi lintang matahari, angin, iklim luar (suhu & RH), dan pengamatan cepat (lingkungan, kelembapan, suhu, bangunan tinggi) dari data lokasi">Terapkan ke simulasi</button><button type="button" class="pl-btn" id="lkPng">Unduh PNG lembar</button>` : ''}<button type="button" class="pl-btn pl-primary" id="pxOk">Selesai</button>`, true);
     bindTabs();
     $('#pxOk').onclick = () => dlg.close();
     $('#lkGo').onclick = async () => {
@@ -1149,7 +1157,7 @@ async function exportSheet() {
   try {
     const three = await A.load3D();
     const img3d = three.snapshotSheet(m, 1280, 960);   // semua lantai, tanpa burung / peta; tampilan 3D pengguna dikembalikan
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930b');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930c');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
     const url = URL.createObjectURL(blob), urlPdf = URL.createObjectURL(canvasPDF(cv));
