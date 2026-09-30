@@ -2,8 +2,8 @@
 // kabel + klem, ventilasi, perangkat ruang audio, dst) + baris tambahan bebas. Jumlah dihitung dari desain; harga satuan
 // bisa diubah dan tersimpan di desain (m.rab.h), keterangan di m.rab.k, baris tambahan di m.rab.x.
 // Harga bawaan hanya PERKIRAAN pasar — wajib disesuaikan harga lokal. RAB ini belum termasuk struktur bangunan (RAB sipil).
-import { AMPLI, AUDIO_ALAT, SARANG_JENIS } from './planner-data.js?v=20260930c';
-import { levels, floorHt } from './planner-geom.js?v=20260930c';
+import { AMPLI, AUDIO_ALAT, SARANG_JENIS } from './planner-data.js?v=20260930d';
+import { levels, floorHt } from './planner-geom.js?v=20260930d';
 
 const NAMA_ALAT = Object.fromEntries(AUDIO_ALAT);
 const NAMA_AMPLI = Object.fromEntries(AMPLI.map(([k, n]) => [k, n]));

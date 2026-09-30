@@ -1,16 +1,16 @@
 // Dialog Walet Planner: pilihan awal (manual / pengamatan cepat), pengaturan proyek, tanya-jawab pengamatan,
 // selesai & kirim WhatsApp, link desain, dan lembar desain untuk admin.
-import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930c';
-import { floorSVG } from './planner-draw.js?v=20260930c';
-import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930c';
-import { luxTxt } from './planner-light.js?v=20260930c';
-import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930c';
-import { rabRows } from './planner-rab.js?v=20260930c';
-import * as SK from './planner-sketch.js?v=20260930c';
-import * as SND from './planner-suara.js?v=20260930c';
-import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930c';
-import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930c';
-import * as SITE from './planner-site.js?v=20260930c';
+import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930d';
+import { floorSVG } from './planner-draw.js?v=20260930d';
+import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930d';
+import { luxTxt } from './planner-light.js?v=20260930d';
+import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930d';
+import { rabRows } from './planner-rab.js?v=20260930d';
+import * as SK from './planner-sketch.js?v=20260930d';
+import * as SND from './planner-suara.js?v=20260930d';
+import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930d';
+import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930d';
+import * as SITE from './planner-site.js?v=20260930d';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -43,7 +43,7 @@ export function dlgStart(first = false) {
        <button type="button" id="stQuick">${icon('spark', 22)}<b>Desain dari pengamatan cepat</b><span>Jawab beberapa pertanyaan tentang lokasi dan pengamatan burung — denah, sekat, LAR, dan tweeter dibuat otomatis.</span></button>
        <button type="button" id="stSketch">${icon('photo', 22)}<b>Dari gambar tangan</b><span>Unggah foto sketsa denah (beri tulisan LMB, VOID, LAR, INAP…) lalu jiplak di atasnya${admin ? ' — atau ubah otomatis dengan AI' : ', atau kirim ke tim kami untuk dirapikan'}.</span></button>
      </div>
-     ${first ? '<p class="tip" style="margin-top:12px">Di belakang dialog ini sudah ada contoh desain 4×12 m, 4 lantai.</p>' : '<p class="tip" style="margin-top:12px">Desain yang sedang terbuka akan diganti — salin link desainnya dulu bila ingin menyimpannya.</p>'}`,
+     ${first ? '<p class="tip" style="margin-top:12px">Di belakang dialog ini sudah ada contoh desain 4×12 m, 4 lantai. Baru pertama kali? Baca <a href="/desain/panduan/" target="_blank" rel="noopener">Buku panduan</a>.</p>' : '<p class="tip" style="margin-top:12px">Desain yang sedang terbuka akan diganti — salin link desainnya dulu bila ingin menyimpannya.</p>'}`,
     `<button type="button" class="pl-btn" id="stSkip">${first ? 'Lihat contoh dulu' : 'Batal'}</button>`, 'mid');
   $('#stManual').onclick = () => dlgManual(true);
   $('#stQuick').onclick = () => dlgSurvey({});
@@ -200,7 +200,7 @@ export function dlgFinish() {
 
 // ---------- ekspor PDF multi-lembar (centang lembar yang diikutkan) ----------
 export async function dlgPDF() {
-  const { LEMBAR } = await import('./planner-pdf.js?v=20260930c');
+  const { LEMBAR } = await import('./planner-pdf.js?v=20260930d');
   openDlg('Ekspor PDF — pilih lembar',
     `<p class="lead">Setiap lembar berisi gambaran semua lantai untuk satu tema, lengkap dengan penjelasan & legenda. Centang yang mau diikutkan ke PDF.</p>
      <div class="pdfl">${LEMBAR.map(([k, nm]) => `<label class="chk"><input type="checkbox" data-pk="${k}" checked> ${nm}</label>`).join('')}</div>
@@ -217,7 +217,7 @@ export async function dlgPDF() {
     try {
       const m = A.model;
       const img3d = keys.includes('lengkap') ? (await A.load3D()).snapshotSheet(m, 1280, 960) : null;
-      const { buildPDF } = await import('./planner-pdf.js?v=20260930c');
+      const { buildPDF } = await import('./planner-pdf.js?v=20260930d');
       const blob = await buildPDF(m, keys, img3d, t => { btn.textContent = t; });
       const url = URL.createObjectURL(blob), el = document.createElement('a');
       el.href = url; el.download = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${keys.length}lembar.pdf`;
@@ -234,7 +234,7 @@ export async function downloadPDF(btn) {
   const t0 = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = 'Menyiapkan PDF…'; }
   try {
     const m = A.model, three = await A.load3D(), img3d = three.snapshotSheet(m, 1280, 960);
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930c');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930d');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const url = URL.createObjectURL(canvasPDF(cv));
     const el = document.createElement('a');
@@ -1131,12 +1131,13 @@ export function dlgHelp() {
     ['🗺️ Foto satelit', 'Kartu "Lokasi (satelit)" di panel kanan: screenshot Google Maps (mode satelit) lokasi Anda, unggah, atur lebar & putar — gedung terlihat di lahan aslinya.'],
     ['💰 RAB', 'Tombol "RAB": tabel nama item, jumlah (otomatis dari desain), harga satuan (bisa diedit), total, keterangan; bisa tambah baris & salin ke Excel/WA.'],
     ['🖼️ Presentasi', 'Tombol "Presentasi": aksonometri exploded ala diagram arsitek — pilih tipe (lengkap per lantai / interior / eksterior / breakdown item), gaya warna, jarak antar lapisan; item digambar detail (papan sirip sesuai jaraknya, corong tweeter sesuai arah, kusen LMB, sarang, kolam, tangga). Tiap bagian diberi garis keterangan yang teksnya BISA DIEDIT, disembunyikan, dipindah sisi kiri/kanan (tombol ↔), dan digeser naik-turun; hasil bisa diunduh PNG HD atau ikut PDF.'],
-    ['📍 Analisis lokasi', 'Di dialog Presentasi, tab "Analisis lokasi": tempel titik/link Google Maps → panel jalan & kebisingan, jalur matahari, mawar angin 12 bulan, topografi, ekologi radius 1 km (data OpenStreetMap + Open-Meteo, gratis) + kesimpulan untuk RBW. Tombol "Terapkan ke simulasi" mengisi arah/kecepatan angin & lingkungan pengamatan; lembarnya bisa diunduh PNG atau ikut PDF.'],
+    ['📍 Analisis lokasi', 'Di dialog Presentasi, tab "Analisis lokasi": tempel titik/link Google Maps → 12 panel (jalan & kebisingan dB(A), bangunan sekitar, matahari, angin per semester, hujan & risiko genangan, topografi, suhu & kelembapan 12 bulan, ekologi & indeks pakan, sumber bising, kendala & peluang, skor kelayakan lokasi) + implikasi untuk desain RBW. Data gratis dari OpenStreetMap & Open-Meteo. "Terapkan ke simulasi" mengisi lintang matahari, angin, iklim luar (suhu & RH), dan jawaban pengamatan cepat; lembarnya bisa diunduh PNG atau ikut PDF (2 halaman).'],
     ['⭐ Skor & tanda lokasi', 'Klik catatan analisis yang bergaris bawah — lantainya dibuka dan lokasinya ditandai kotak merah berkedip.'],
     ['📤 Selesai & konsultasi', 'Kirim desain + link ke WhatsApp tim GedungWalet.com. Seluruh desain (termasuk channel, RAB, pengaturan simulasi) tersimpan di link.'],
   ];
   openDlg('Pahami fitur Walet Planner',
-    `<p class="lead">Ringkasan semua fitur. Klik tiap judul untuk membuka.</p>
+    `<div class="pl-buku"><b>Buku panduan lengkap</b><span>Langkah demi langkah dengan tangkapan layar asli, contoh alur kerja, tanya-jawab, dan pintasan keyboard.</span><a class="pl-btn pl-blue" href="/desain/panduan/" target="_blank" rel="noopener">Baca online</a><a class="pl-btn" href="/desain/panduan/Buku-Panduan-Walet-Planner.pdf" target="_blank" rel="noopener" download>Unduh PDF</a></div>
+     <p class="lead">Ringkasan semua fitur. Klik tiap judul untuk membuka.</p>
      ${F.map(([t, b], i) => `<details class="leg"${i === 0 ? ' open' : ''}><summary>${t}</summary><p class="hlp">${b}</p></details>`).join('')}`,
     `<button type="button" class="pl-btn pl-primary" id="hlOk">Mengerti</button>`, 'mid');
   $('#hlOk').onclick = () => dlg.close();
@@ -1157,7 +1158,7 @@ async function exportSheet() {
   try {
     const three = await A.load3D();
     const img3d = three.snapshotSheet(m, 1280, 960);   // semua lantai, tanpa burung / peta; tampilan 3D pengguna dikembalikan
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930c');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930d');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
     const url = URL.createObjectURL(blob), urlPdf = URL.createObjectURL(canvasPDF(cv));

@@ -2,20 +2,20 @@
 // inap, sirip, tata ruang, ruang audio, void, pencahayaan, kenyamanan, inap vs jalur, ventilasi, dB, gabungan) +
 // penjelasan rinci & legenda, lalu lembar analisis kelayakan dan lembar RAB. Lembar yang diekspor dipilih lewat
 // centang di dialog "Ekspor PDF".
-import { TYPES, RULES, SUARA, AMPLI, AUDIO_ALAT, dbTarget, SARANG_JENIS, SARANG_WARNA } from './planner-data.js?v=20260930c';
-import { levels, floorRect, floorHt, center, isLar } from './planner-geom.js?v=20260930c';
-import { floorSVG, symbolSVG } from './planner-draw.js?v=20260930c';
-import { simulate, heatURL, luxTxt, simOf, arahNama, LUX_STOPS, luxColor } from './planner-light.js?v=20260930c';
-import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930c';
-import { comfort, TINGKAT } from './planner-comfort.js?v=20260930c';
-import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930c';
-import { rabRows } from './planner-rab.js?v=20260930c';
-import { climate, simulateAir } from './planner-air.js?v=20260930c';
-import { analyze } from './planner-analysis.js?v=20260930c';
-import { makeSheetCanvas, pagesPDF } from './planner-export.js?v=20260930c';
-import { audioElevSVG, defaultLayout, AMPLI_KEYS } from './planner-audio2d.js?v=20260930c';
-import { axoSVG, AXO_TIPE, AXO_PALET, AXO_DEFAULT } from './planner-axo.js?v=20260930c';
-import { lembarLokasiSVG, teksLokasi, hitung as hitungLokasi } from './planner-site.js?v=20260930c';
+import { TYPES, RULES, SUARA, AMPLI, AUDIO_ALAT, dbTarget, SARANG_JENIS, SARANG_WARNA } from './planner-data.js?v=20260930d';
+import { levels, floorRect, floorHt, center, isLar } from './planner-geom.js?v=20260930d';
+import { floorSVG, symbolSVG } from './planner-draw.js?v=20260930d';
+import { simulate, heatURL, luxTxt, simOf, arahNama, LUX_STOPS, luxColor } from './planner-light.js?v=20260930d';
+import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930d';
+import { comfort, TINGKAT } from './planner-comfort.js?v=20260930d';
+import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930d';
+import { rabRows } from './planner-rab.js?v=20260930d';
+import { climate, simulateAir } from './planner-air.js?v=20260930d';
+import { analyze } from './planner-analysis.js?v=20260930d';
+import { makeSheetCanvas, pagesPDF } from './planner-export.js?v=20260930d';
+import { audioElevSVG, defaultLayout, AMPLI_KEYS } from './planner-audio2d.js?v=20260930d';
+import { axoSVG, AXO_TIPE, AXO_PALET, AXO_DEFAULT } from './planner-axo.js?v=20260930d';
+import { lembarLokasiSVG, teksLokasi, hitung as hitungLokasi } from './planner-site.js?v=20260930d';
 
 export const LEMBAR = [
   ['tarik', 'Denah suara tarik (tweeter & kabel)'],

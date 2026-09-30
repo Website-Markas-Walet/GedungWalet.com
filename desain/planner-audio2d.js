@@ -1,7 +1,7 @@
 // Gambar 2D TAMPAK DEPAN (elevasi): (1) dinding ruang audio yang bisa diisi perangkat dari katalog — tweeter kontrol
 // per channel, saklar, stop kontak, timer Kitani/AC, kipas DC, ampli AXM/Piro di meja, aki, lampu — meniru foto rak
 // asli; (2) susunan tweeter di sekeliling LMB. Dipakai tab "Ruang audio", dialog LMB, dan lembar PDF.
-import { AMPLI, AUDIO_ALAT, AUDIO_DEFAULT } from './planner-data.js?v=20260930c';
+import { AMPLI, AUDIO_ALAT, AUDIO_DEFAULT } from './planner-data.js?v=20260930d';
 
 export const WALL_W = 3.6, WALL_H = 2.3, MEJA_Y = 1.62;   // dinding elevasi (m); meja ampli di 1,62 m dari atas dinding? (y dari atas)
 const f1 = v => Math.round(v * 10) / 10;

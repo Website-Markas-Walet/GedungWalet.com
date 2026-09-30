@@ -1,11 +1,11 @@
 // Analisis kelayakan desain — aturan buku Budidaya Walet Markaswalet & DED GedungWalet.
 // Catatan diberi `at` (lantai + kotak) supaya bisa diklik → lokasinya ditandai di denah.
-import { RULES, SUARA } from './planner-data.js?v=20260930c';
-import { derive, center, dist, ovArea, inRect, angDiff, distToRect, siripEfektif, siripVolume, twinapRekomendasi, isLar, floorRect, floorHt, levels } from './planner-geom.js?v=20260930c';
-import { simulate, luxTxt } from './planner-light.js?v=20260930c';
-import { climate } from './planner-air.js?v=20260930c';
-import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930c';
-import { cableInfo, channels as kanal, chCover } from './planner-cable.js?v=20260930c';   // "channels" dipakai sebagai variabel lokal di bawah
+import { RULES, SUARA } from './planner-data.js?v=20260930d';
+import { derive, center, dist, ovArea, inRect, angDiff, distToRect, siripEfektif, siripVolume, twinapRekomendasi, isLar, floorRect, floorHt, levels } from './planner-geom.js?v=20260930d';
+import { simulate, luxTxt } from './planner-light.js?v=20260930d';
+import { climate } from './planner-air.js?v=20260930d';
+import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930d';
+import { cableInfo, channels as kanal, chCover } from './planner-cable.js?v=20260930d';   // "channels" dipakai sebagai variabel lokal di bawah
 
 const fmt = n => (+n).toLocaleString('id-ID');
 const r1 = v => Math.round(v * 10) / 10;

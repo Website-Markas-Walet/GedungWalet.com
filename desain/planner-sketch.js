@@ -1,7 +1,7 @@
 // Sketsa gambar tangan: foto sketsa jadi latar transparan per lantai (untuk dijiplak), kalibrasi 2 titik,
 // dan konversi otomatis oleh AI (khusus tim, lewat Cloudflare Worker "sketsa-ai") menjadi elemen denah yang bisa direvisi.
-import { TYPES, RULES, SKETCH_API, TW } from './planner-data.js?v=20260930c';
-import { floorRect, snapToWall, clampInto, derive, twinapPattern, inRect, center, isLar } from './planner-geom.js?v=20260930c';
+import { TYPES, RULES, SKETCH_API, TW } from './planner-data.js?v=20260930d';
+import { floorRect, snapToWall, clampInto, derive, twinapPattern, inRect, center, isLar } from './planner-geom.js?v=20260930d';
 
 const LS_TEAM = 'waletPlanner.teamKey', LS_AI = 'waletPlanner.aiUrl';
 const r2 = v => Math.round(v * 100) / 100;

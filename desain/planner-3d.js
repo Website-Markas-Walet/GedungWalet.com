@@ -4,10 +4,10 @@
 // partikel aliran udara. Gedung dibangun ulang dari model setiap kali dipanggil; kawanan burung tetap hidup.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { derive, structure, floorRect, floorHt, rectDiff, wallSideRuns, levels, center, inRect } from './planner-geom.js?v=20260930c';
-import { sunPos, simOf, luxColor, arahNama } from './planner-light.js?v=20260930c';
-import { comfort, TINGKAT } from './planner-comfort.js?v=20260930c';
-import { SARANG_WARNA } from './planner-data.js?v=20260930c';
+import { derive, structure, floorRect, floorHt, rectDiff, wallSideRuns, levels, center, inRect } from './planner-geom.js?v=20260930d';
+import { sunPos, simOf, luxColor, arahNama } from './planner-light.js?v=20260930d';
+import { comfort, TINGKAT } from './planner-comfort.js?v=20260930d';
+import { SARANG_WARNA } from './planner-data.js?v=20260930d';
 
 let renderer, scene, camera, controls, host, raf, group, flock, sunL, hemi, legend, tagBox, statBox, bar, senter, sync3;
 const geoCache = new Map(), matCache = new Map();
