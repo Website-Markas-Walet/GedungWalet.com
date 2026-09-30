@@ -528,14 +528,17 @@ export function siripEfektif(fl, der) {
   return sum(der.rooms, blk(['void', 'jalur', 'audio'])) + sum(der.jrooms || [], blk(['void', 'audio', 'inap']));
 }
 
-// Kolom (grid modul, sejajar titik 0 gedung) & balok (setengah modul) di dalam batas lantai F.
+// Kolom & balok pada grid modul (sejajar titik 0 gedung) di dalam batas lantai F.
+// Jarak antar kolom/balok = m.kolom (bebas 1,5–8 m, kartu "Ukuran gedung"); balok utama hanya
+// pada garis grid kolom — TANPA balok anakan setengah modul (permintaan pemilik).
 export function structure(m, F = { x: 0, y: 0, w: m.w, h: m.h }) {
-  const k = m.kolom || RULES.kolom, h2 = k / 2;
-  const xs = new Set([r2(F.x), r2(F.x + F.w)]), ys = new Set([r2(F.y), r2(F.y + F.h)]), bx = [], by = [];
+  const k = Math.min(8, Math.max(1.5, +m.kolom || RULES.kolom));
+  const xs = new Set([r2(F.x), r2(F.x + F.w)]), ys = new Set([r2(F.y), r2(F.y + F.h)]);
   for (let x = Math.ceil((F.x - 1e-6) / k) * k; x <= F.x + F.w + 1e-6; x += k) xs.add(r2(x));
   for (let y = Math.ceil((F.y - 1e-6) / k) * k; y <= F.y + F.h + 1e-6; y += k) ys.add(r2(y));
-  for (let x = Math.ceil((F.x + 0.05) / h2) * h2; x < F.x + F.w - 0.05; x += h2) bx.push(r2(x));
-  for (let y = Math.ceil((F.y + 0.05) / h2) * h2; y < F.y + F.h - 0.05; y += h2) by.push(r2(y));
   const sort = s => [...s].sort((a, b) => a - b);
-  return { xs: sort(xs), ys: sort(ys), bx, by, F };
+  const sx = sort(xs), sy = sort(ys);
+  const bx = sx.filter(x => x > F.x + 0.05 && x < F.x + F.w - 0.05);
+  const by = sy.filter(y => y > F.y + 0.05 && y < F.y + F.h - 0.05);
+  return { xs: sx, ys: sy, bx, by, F };
 }
