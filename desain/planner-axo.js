@@ -2,8 +2,8 @@
 // lantai/lapisan ditarik ke atas dengan garis bantu putus-putus, tiap bagian diberi keterangan
 // (nama + spesifikasi) lewat garis tarikan yang teksnya bisa diedit dan digeser naik-turun.
 // Proyeksi isometrik 30°: u = (x − y)·cos30 · S, v = (x + y)·sin30 · S − z·S (satuan dunia = meter).
-import { TYPES, RULES, ARAH8, SARANG_JENIS } from './planner-data.js?v=20260930d';
-import { levels, floorRect, floorHt, structure, center } from './planner-geom.js?v=20260930d';
+import { TYPES, RULES, ARAH8, SARANG_JENIS } from './planner-data.js?v=20261007a';
+import { levels, floorRect, floorHt, structure, center } from './planner-geom.js?v=20261007a';
 
 export const AXO_TIPE = [
   ['semua', 'Lengkap per lantai'],
