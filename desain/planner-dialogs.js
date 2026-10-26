@@ -1,16 +1,16 @@
 // Dialog Walet Planner: pilihan awal (manual / pengamatan cepat), pengaturan proyek, tanya-jawab pengamatan,
 // selesai & kirim WhatsApp, link desain, dan lembar desain untuk admin.
-import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20260930d';
-import { floorSVG } from './planner-draw.js?v=20260930d';
-import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20260930d';
-import { luxTxt } from './planner-light.js?v=20260930d';
-import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20260930d';
-import { rabRows } from './planner-rab.js?v=20260930d';
-import * as SK from './planner-sketch.js?v=20260930d';
-import * as SND from './planner-suara.js?v=20260930d';
-import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20260930d';
-import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20260930d';
-import * as SITE from './planner-site.js?v=20260930d';
+import { TYPES, RULES, SIZE_PRESETS, WA_NUMBER, SURVEY, SURVEY_DEFAULT, SUARA, ROLE_ORDER, TW, LANGIT, SISI, AMPLI, AUDIO_ALAT, AUDIO_DEFAULT, dbTarget, icon } from './planner-data.js?v=20261007a';
+import { floorSVG } from './planner-draw.js?v=20261007a';
+import { isFull, derive, inRect, center, floorRect, zonePattern, levels } from './planner-geom.js?v=20261007a';
+import { luxTxt } from './planner-light.js?v=20261007a';
+import { channels, cableInfo, KABEL_JENIS } from './planner-cable.js?v=20261007a';
+import { rabRows } from './planner-rab.js?v=20261007a';
+import * as SK from './planner-sketch.js?v=20261007a';
+import * as SND from './planner-suara.js?v=20261007a';
+import { audioElevSVG, lmbFrontSVG, defaultLayout, ELEV_UKUR, WALL_W, WALL_H, AMPLI_KEYS as A2K } from './planner-audio2d.js?v=20261007a';
+import { AXO_TIPE, AXO_PALET, AXO_DEFAULT, axoSVG, axoCallouts } from './planner-axo.js?v=20261007a';
+import * as SITE from './planner-site.js?v=20261007a';
 
 let A = null;                       // API dari planner.js
 let admin = false;                  // mode tim (/desain/?admin=1)
@@ -200,7 +200,7 @@ export function dlgFinish() {
 
 // ---------- ekspor PDF multi-lembar (centang lembar yang diikutkan) ----------
 export async function dlgPDF() {
-  const { LEMBAR } = await import('./planner-pdf.js?v=20260930d');
+  const { LEMBAR } = await import('./planner-pdf.js?v=20261007a');
   openDlg('Ekspor PDF — pilih lembar',
     `<p class="lead">Setiap lembar berisi gambaran semua lantai untuk satu tema, lengkap dengan penjelasan & legenda. Centang yang mau diikutkan ke PDF.</p>
      <div class="pdfl">${LEMBAR.map(([k, nm]) => `<label class="chk"><input type="checkbox" data-pk="${k}" checked> ${nm}</label>`).join('')}</div>
@@ -217,7 +217,7 @@ export async function dlgPDF() {
     try {
       const m = A.model;
       const img3d = keys.includes('lengkap') ? (await A.load3D()).snapshotSheet(m, 1280, 960) : null;
-      const { buildPDF } = await import('./planner-pdf.js?v=20260930d');
+      const { buildPDF } = await import('./planner-pdf.js?v=20261007a');
       const blob = await buildPDF(m, keys, img3d, t => { btn.textContent = t; });
       const url = URL.createObjectURL(blob), el = document.createElement('a');
       el.href = url; el.download = `Desain-RBW-${(m.name || 'rumah-walet').replace(/[^\w-]+/g, '-')}-${keys.length}lembar.pdf`;
@@ -234,7 +234,7 @@ export async function downloadPDF(btn) {
   const t0 = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = 'Menyiapkan PDF…'; }
   try {
     const m = A.model, three = await A.load3D(), img3d = three.snapshotSheet(m, 1280, 960);
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930d');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20261007a');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const url = URL.createObjectURL(canvasPDF(cv));
     const el = document.createElement('a');
@@ -246,10 +246,18 @@ export async function downloadPDF(btn) {
   finally { if (btn) setTimeout(() => { btn.disabled = false; btn.textContent = t0; }, 2500); }
 }
 
-// ---------- login & folder proyek (gerbang sisi-klien: kredensial tetap terlihat di kode — bukan keamanan server,
-// hanya membatasi akses kasual sesuai permintaan pemilik; data proyek tersimpan di localStorage perangkat) ----------
-const LOGIN = { u: 'admin', p: 'admin123' };
-export const isAuthed = () => { try { return localStorage.getItem('waletPlanner.login') === '1'; } catch { return false; } };
+// ---------- login & folder proyek (gerbang sisi-klien — bukan keamanan server, hanya membatasi akses kasual sesuai
+// permintaan pemilik; data proyek tersimpan di localStorage perangkat). Kode situs & repo terbuka untuk umum, jadi kata
+// sandi disimpan sebagai hash PBKDF2-SHA256 (salt & hash heksadesimal, 32 byte), bukan teks biasa ----------
+const LOGIN = { u: 'admin', iter: 200000, salt: '09dd22dfff03c4433de26ec55f94e0c2', h: 'c1fb8580432531393883247ad2a18a4041473728368fdf430c8d7274ee78cb21' };
+const SESI = 'v2.' + LOGIN.h.slice(0, 16);   // ikut berubah saat kata sandi diganti → perangkat yang sudah masuk diminta login ulang
+const hashPw = async pw => {
+  const kunci = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+  const salt = Uint8Array.from(LOGIN.salt.match(/../g), x => parseInt(x, 16));
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: LOGIN.iter }, kunci, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+};
+export const isAuthed = () => { try { return localStorage.getItem('waletPlanner.login') === SESI; } catch { return false; } };
 export function dlgLogin(onOk) {
   openDlg('Masuk Walet Planner',
     `<p class="lead">Halaman desain ini khusus pengguna terdaftar. Masuk untuk membuka editor dan folder proyek Anda.</p>
@@ -259,13 +267,24 @@ export function dlgLogin(onOk) {
     `<button type="button" class="pl-btn pl-primary" id="lgIn">Masuk</button>`);
   $('#dClose').style.display = 'none';
   dlg.oncancel = e => e.preventDefault();   // Esc tidak menutup sebelum berhasil masuk
-  const masuk = () => {
-    if ($('#lgU').value.trim() === LOGIN.u && $('#lgP').value === LOGIN.p) {
-      try { localStorage.setItem('waletPlanner.login', '1'); } catch {}
+  const tb = $('#lgIn');
+  let sibuk = false;
+  const masuk = async () => {
+    if (sibuk) return;
+    sibuk = true; tb.disabled = true;
+    let ok = false, galat = false;
+    try { ok = $('#lgU').value.trim() === LOGIN.u && await hashPw($('#lgP').value) === LOGIN.h; } catch { galat = true; }
+    sibuk = false; tb.disabled = false;
+    if (ok) {
+      try { localStorage.setItem('waletPlanner.login', SESI); } catch {}
       dlg.oncancel = null; dlg.close(); onOk?.();
-    } else { $('#lgErr').hidden = false; $('#lgP').value = ''; $('#lgP').focus(); }
+    } else {
+      const e = $('#lgErr');
+      e.textContent = galat ? 'Login butuh sambungan aman — buka lewat https://gedungwalet.com/desain/' : 'Username atau password salah.';
+      e.hidden = false; $('#lgP').value = ''; $('#lgP').focus();
+    }
   };
-  $('#lgIn').onclick = masuk;
+  tb.onclick = masuk;
   [$('#lgU'), $('#lgP')].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') masuk(); }));
   $('#lgU').focus();
 }
@@ -1158,7 +1177,7 @@ async function exportSheet() {
   try {
     const three = await A.load3D();
     const img3d = three.snapshotSheet(m, 1280, 960);   // semua lantai, tanpa burung / peta; tampilan 3D pengguna dikembalikan
-    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20260930d');
+    const { makeSheetCanvas, canvasPDF } = await import('./planner-export.js?v=20261007a');
     const cv = await makeSheetCanvas(m, A.analyze(), img3d);
     const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('toBlob gagal'))), 'image/png'));
     const url = URL.createObjectURL(blob), urlPdf = URL.createObjectURL(canvasPDF(cv));

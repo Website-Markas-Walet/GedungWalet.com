@@ -1,18 +1,18 @@
 // Walet Planner — editor denah rumah walet (2D + 3D): state, interaksi, panel properti & analisis.
-import { CATALOG, TYPES, RULES, TARIK_ROLES, TW, LAR_FUNGSI, ARAH8, LANGIT, SISI, SARANG_JENIS, icon } from './planner-data.js?v=20260930d';
-import { climate } from './planner-air.js?v=20260930d';
-import { simulateSound, nilaiDb } from './planner-sound.js?v=20260930d';
-import { cableInfo, channels, chCover } from './planner-cable.js?v=20260930d';
-import * as SND from './planner-suara.js?v=20260930d';
-import { derive, snapToWall, snapHexa, isLar, center, inRect, twinapRekomendasi, zonePattern, siripDetail, siripVolume, pushOffWalls, snap90, dist, distToRect, angDiff, floorRect, floorHt, clampInto, isFull, ovArea, levels } from './planner-geom.js?v=20260930d';
-import { drawFloor, symbolSVG } from './planner-draw.js?v=20260930d';
-import { generate } from './planner-auto.js?v=20260930d';
-import { analyze } from './planner-analysis.js?v=20260930d';
-import { simulate, heatURL, luxColor, luxTxt, kategori, LUX_STOPS, simOf, arahNama, facadeAz } from './planner-light.js?v=20260930d';
-import { simulateAir, suhuLuar } from './planner-air.js?v=20260930d';
-import { comfort, TINGKAT } from './planner-comfort.js?v=20260930d';
-import * as D from './planner-dialogs.js?v=20260930d';
-import * as SK from './planner-sketch.js?v=20260930d';
+import { CATALOG, TYPES, RULES, TARIK_ROLES, TW, LAR_FUNGSI, ARAH8, LANGIT, SISI, SARANG_JENIS, icon } from './planner-data.js?v=20261007a';
+import { climate } from './planner-air.js?v=20261007a';
+import { simulateSound, nilaiDb } from './planner-sound.js?v=20261007a';
+import { cableInfo, channels, chCover } from './planner-cable.js?v=20261007a';
+import * as SND from './planner-suara.js?v=20261007a';
+import { derive, snapToWall, snapHexa, isLar, center, inRect, twinapRekomendasi, zonePattern, siripDetail, siripVolume, pushOffWalls, snap90, dist, distToRect, angDiff, floorRect, floorHt, clampInto, isFull, ovArea, levels } from './planner-geom.js?v=20261007a';
+import { drawFloor, symbolSVG } from './planner-draw.js?v=20261007a';
+import { generate } from './planner-auto.js?v=20261007a';
+import { analyze } from './planner-analysis.js?v=20261007a';
+import { simulate, heatURL, luxColor, luxTxt, kategori, LUX_STOPS, simOf, arahNama, facadeAz } from './planner-light.js?v=20261007a';
+import { simulateAir, suhuLuar } from './planner-air.js?v=20261007a';
+import { comfort, TINGKAT } from './planner-comfort.js?v=20261007a';
+import * as D from './planner-dialogs.js?v=20261007a';
+import * as SK from './planner-sketch.js?v=20261007a';
 
 const $ = s => document.querySelector(s);
 const LS_KEY = 'waletPlanner.v2';
@@ -210,7 +210,7 @@ const app = {
     if (!on && !isFull(model, t)) { delete t.fx; delete t.fy; delete t.fw; delete t.fh; }
   },
   async load3D() {   // janji tunggal — dua pemanggil beriringan tidak boleh me-mount dua kali
-    if (!threeP) threeP = import('./planner-3d.js?v=20260930d').then(t => { t.mount($('#view3d')); return (three = t); });
+    if (!threeP) threeP = import('./planner-3d.js?v=20261007a').then(t => { t.mount($('#view3d')); return (three = t); });
     return threeP;
   },
   mulaiJalur,

@@ -5,7 +5,7 @@
 // dihitung jadi 12 panel ala diagram arsitek (lokasi, bangunan, jalan/bising, matahari, angin, air & hujan, topografi,
 // suhu & kelembapan, ekologi, sumber bising & aktivitas, kendala & peluang, skor kelayakan) + implikasi untuk desain RBW.
 // Ringkasan (m.lokasi.amb) sengaja kecil & berupa angka bulat supaya ikut tersimpan di link desain.
-import { ARAH8, RULES, SUARA } from './planner-data.js?v=20260930d';
+import { ARAH8, RULES, SUARA } from './planner-data.js?v=20261007a';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const f1 = n => Math.round(n * 10) / 10;
