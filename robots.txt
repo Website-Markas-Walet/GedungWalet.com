@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+Disallow: /cms/
+Disallow: /handoff/
+Disallow: /cdn-cgi/
+Disallow: /*.md$
+
+Sitemap: https://gedungwalet.com/sitemap_index.xml
